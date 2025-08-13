@@ -123,7 +123,10 @@ export default function StreamingChatScreen() {
                   pressed && styles.buttonPressed,
                   !prompt.trim() && styles.buttonDisabled,
                 ]}
-                onPress={() => startStreaming({ prompt })}
+                onPress={() => {
+                  startStreaming({ prompt });
+                  setPrompt('');
+                }}
                 disabled={!prompt.trim()}
               >
                 <Text style={[styles.buttonText, { color: colors.buttonText }]}>

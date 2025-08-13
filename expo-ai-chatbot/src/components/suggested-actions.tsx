@@ -11,19 +11,14 @@ import Animated, {
 } from "react-native-reanimated";
 import { useStore } from "@/lib/globalStore";
 import { generateUUID } from "@/lib/utils";
-import type { Message, CreateMessage } from "@ai-sdk/react";
-
 interface SuggestedActionsProps {
   hasInput?: boolean;
-  append: (
-    message: Message | CreateMessage,
-    chatRequestOptions?: { body?: object },
-  ) => Promise<string | null | undefined>;
+  onSubmit: (message: string) => void;
 }
 
 export function SuggestedActions({
   hasInput = false,
-  append,
+  onSubmit,
 }: SuggestedActionsProps) {
   const { selectedImageUris, setChatId } = useStore();
   const { width } = useWindowDimensions();
@@ -44,20 +39,12 @@ export function SuggestedActions({
     opacity: opacity.value,
   }));
 
-  const handlePress = async (action: string) => {
+  const handlePress = (action: string) => {
     const newChatId = generateUUID();
     setChatId({ id: newChatId, from: "newChat" });
-
-    // Send the initial message using append
-    await append(
-      {
-        role: "user",
-        content: action,
-      },
-      {
-        body: { id: newChatId },
-      },
-    );
+    
+    // Submit the action message
+    onSubmit(action);
   };
 
   const actions = [

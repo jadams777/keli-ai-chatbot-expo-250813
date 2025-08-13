@@ -9,6 +9,7 @@ import { WelcomeMessage } from "@/components/welcome-message";
 import React, { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 import { LottieLoader } from "@/components/lottie-loader";
+import { useStore } from "@/lib/globalStore";
 
 type ToolInvocation = {
   toolName: string;
@@ -28,11 +29,13 @@ type ChatInterfaceProps = {
   messages: Message[];
   scrollViewRef: React.RefObject<ScrollView>;
   isLoading?: boolean;
+  streamingMessageId?: string | null;
 };
 
 export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
-  ({ messages, scrollViewRef, isLoading }, ref) => {
+  ({ messages, scrollViewRef, isLoading, streamingMessageId }, ref) => {
     const { keyboardShown, keyboardHeight } = useKeyboard();
+    const { streaming } = useStore();
 
     return (
       <View className="flex-1">
@@ -88,11 +91,19 @@ export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
                             {m.role === "user" ? "" : "🤖"}
                           </Text>
                         </View>
-                        <CustomMarkdown content={m.content} />
+                        <CustomMarkdown 
+                          content={
+                            streaming.isStreaming && 
+                            streaming.currentMessageId === m.id && 
+                            m.role === "assistant"
+                              ? streaming.streamingText || m.content
+                              : m.content
+                          } 
+                        />
                       </>
                     )}
                   </View>
-                  {isLoading &&
+                  {(isLoading || streaming.isStreaming) &&
                     messages[messages.length - 1].role === "user" &&
                     m === messages[messages.length - 1] && (
                       <View className="flex-row">
@@ -108,6 +119,16 @@ export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
                         </View>
                       </View>
                     )}
+                  {streaming.error && (
+                    <View className="flex-row px-4 max-w-[95%] pl-0 rounded-3xl">
+                      <View className="mr-2 mt-1 h-8 w-8 items-center justify-center rounded-full bg-red-200">
+                        <Text className="text-base">⚠️</Text>
+                      </View>
+                      <View className="flex-1 py-2">
+                        <Text className="text-red-600">Error: {streaming.error}</Text>
+                      </View>
+                    </View>
+                  )}
                 </React.Fragment>
               ))
             : null}

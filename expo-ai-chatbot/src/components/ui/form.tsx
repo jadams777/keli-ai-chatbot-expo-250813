@@ -72,14 +72,14 @@ const FormItemContext = React.createContext<FormItemContextValue>(
 );
 
 const FormItem = React.forwardRef<
-  View,
+  React.ElementRef<typeof View>,
   React.ComponentPropsWithoutRef<typeof View>
 >(({ className, ...props }, ref) => {
   const id = React.useId();
 
   return (
     <FormItemContext.Provider value={{ id }}>
-      <View ref={ref} className={cn("space-y-2", className)} {...props} />
+      <View ref={ref as any} className={cn("space-y-2", className)} {...props} />
     </FormItemContext.Provider>
   );
 });
@@ -95,8 +95,7 @@ const FormLabel = React.forwardRef<
     <Label
       ref={ref}
       className={cn(error && "text-red-400", className)}
-      nativeID={formItemId}
-      {...props}
+      {...(props as any)}
     />
   );
 });

@@ -23,9 +23,18 @@ export function ColorSchemeProvider({
   children: React.ReactNode;
 }): JSX.Element {
   const deviceColorScheme = useDeviceColorScheme();
-  const [colorScheme, setColorScheme] = useState<"dark" | "light">(
-    getPersistedColorScheme() ?? deviceColorScheme
-  );
+  const [colorScheme, setColorScheme] = useState<"dark" | "light">(deviceColorScheme ?? "light");
+  
+  // Load persisted color scheme on mount
+  useEffect(() => {
+    const loadPersistedColorScheme = async () => {
+      const persistedScheme = await getPersistedColorScheme();
+      if (persistedScheme) {
+        setColorScheme(persistedScheme);
+      }
+    };
+    loadPersistedColorScheme();
+  }, []);
   const changeTheme = useCallback((newColorScheme: ColorSchemeName) => {
     if (!newColorScheme) return;
     persistColorScheme(newColorScheme);

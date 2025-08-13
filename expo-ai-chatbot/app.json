@@ -6,6 +6,7 @@
     "userInterfaceStyle": "automatic",
     "orientation": "portrait",
     "version": "0.0.1",
+    "newArchEnabled": true,
     "web": {
       "output": "server",
       "bundler": "metro"
@@ -24,7 +25,8 @@
         "expo-build-properties",
         {
           "ios": {
-            "deploymentTarget": "15.1"
+            "useFrameworks": "static",
+            "deploymentTarget": "26.0"
           },
           "android": {
             "kotlinVersion": "1.6.21"
@@ -55,7 +57,11 @@
     },
     "ios": {
       "bundleIdentifier": "com.expoaichatbot.lite",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "deploymentTarget": "26.0",
+      "infoPlist": {
+        "NSAppleIntelligenceUsageDescription": "This app uses Apple Intelligence to provide AI-powered features with privacy-first, on-device processing."
+      }
     },
     "runtimeVersion": {
       "policy": "appVersion"

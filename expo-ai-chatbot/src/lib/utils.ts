@@ -3,12 +3,25 @@ import { Platform } from "react-native";
 import { twMerge } from "tailwind-merge";
 import type {
   CoreAssistantMessage,
-  CoreMessage,
+  ModelMessage,
   CoreToolMessage,
-  Message,
+  UIMessage,
   ToolInvocation,
 } from "ai";
-import type { Message as DBMessage, Document } from "@/lib/db/schema";
+
+// Type definitions for database messages
+interface DBMessage {
+  id: string;
+  role: string;
+  content: string | any[];
+}
+
+interface Document {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: Date;
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -71,8 +84,8 @@ function addToolMessageToChat({
   messages,
 }: {
   toolMessage: CoreToolMessage;
-  messages: Array<Message>;
-}): Array<Message> {
+  messages: Array<UIMessage>;
+}): Array<UIMessage> {
   return messages.map((message) => {
     if (message.toolInvocations) {
       return {
@@ -101,8 +114,8 @@ function addToolMessageToChat({
 
 export function convertToUIMessages(
   messages: Array<DBMessage>,
-): Array<Message> {
-  return messages.reduce((chatMessages: Array<Message>, message) => {
+): Array<UIMessage> {
+  return messages.reduce((chatMessages: Array<UIMessage>, message) => {
     if (message.role === "tool") {
       return addToolMessageToChat({
         toolMessage: message as CoreToolMessage,
@@ -132,7 +145,7 @@ export function convertToUIMessages(
 
     chatMessages.push({
       id: message.id,
-      role: message.role as Message["role"],
+      role: message.role as UIMessage["role"],
       content: textContent,
       toolInvocations,
     });
@@ -180,7 +193,7 @@ export function sanitizeResponseMessages(
   );
 }
 
-export function sanitizeUIMessages(messages: Array<Message>): Array<Message> {
+export function sanitizeUIMessages(messages: Array<UIMessage>): Array<UIMessage> {
   const messagesBySanitizedToolInvocations = messages.map((message) => {
     if (message.role !== "assistant") return message;
 
@@ -213,7 +226,7 @@ export function sanitizeUIMessages(messages: Array<Message>): Array<Message> {
   );
 }
 
-export function getMostRecentUserMessage(messages: Array<CoreMessage>) {
+export function getMostRecentUserMessage(messages: Array<ModelMessage>) {
   const userMessages = messages.filter((message) => message.role === "user");
   return userMessages.at(-1);
 }
@@ -228,7 +241,7 @@ export function getDocumentTimestampByIndex(
   return documents[index].createdAt;
 }
 
-export function getMessageIdFromAnnotations(message: Message) {
+export function getMessageIdFromAnnotations(message: UIMessage) {
   if (!message.annotations) return message.id;
 
   const [annotation] = message.annotations;

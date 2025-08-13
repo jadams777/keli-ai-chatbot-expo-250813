@@ -9,7 +9,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { Paperclip, ArrowUp, X } from "lucide-react-native";
+import { Paperclip, ArrowUp, X, Square } from "lucide-react-native";
 import { Button } from "./button";
 import Animated, {
   useAnimatedStyle,
@@ -31,8 +31,10 @@ type Props = {
   input: string;
   onChangeText: (text: string) => void;
   onSubmit: () => void;
+  onStop?: () => void;
   scrollViewRef: React.RefObject<ScrollView>;
   focusOnMount?: boolean;
+  isStreaming?: boolean;
 };
 
 interface SelectedImagesProps {
@@ -63,13 +65,12 @@ const ImageItem = ({ uri, onRemove }: ImageItemProps) => {
         }}
         contentFit="cover"
         onLoadEnd={() => setTimeout(() => setIsLoading(false), 2000)}
-      >
-        {isLoading && (
-          <Animated.View className="h-[55px] w-[55px] items-center justify-center rounded-md bg-gray-300 dark:bg-gray-600">
-            <ActivityIndicator size="small" color="white" />
-          </Animated.View>
-        )}
-      </Image>
+      />
+      {isLoading && (
+        <Animated.View className="absolute inset-0 h-[55px] w-[55px] items-center justify-center rounded-md bg-gray-300 dark:bg-gray-600">
+          <ActivityIndicator size="small" color="white" />
+        </Animated.View>
+      )}
       <Pressable
         onPress={() => onRemove(uri)}
         className="absolute -right-2 -top-2 h-5 w-5 items-center justify-center rounded-full bg-gray-200"
@@ -116,13 +117,13 @@ const SelectedImages = ({ uris, onRemove }: SelectedImagesProps) => {
 
 export const ChatInput = forwardRef<TextInput, Props>(
   (
-    { input, onChangeText, onSubmit, scrollViewRef, focusOnMount = false },
+    { input, onChangeText, onSubmit, onStop, scrollViewRef, focusOnMount = false, isStreaming = false },
     ref,
   ) => {
     const { bottom } = useSafeAreaInsets();
     const keyboard = useAnimatedKeyboard();
     const { pickImage } = useImagePicker();
-    const { selectedImageUris, addImageUri, removeImageUri } = useStore();
+    const { selectedImageUris, addImageUri, removeImageUri, streaming } = useStore();
 
     useEffect(() => {
       if (focusOnMount) {
@@ -181,20 +182,39 @@ export const ChatInput = forwardRef<TextInput, Props>(
               value={input}
               onChangeText={onChangeText}
             />
-            <Button
-              size="icon"
-              className="android:h-12 android:w-12 rounded-full bg-black dark:bg-white"
-              onPress={() => {
-                onSubmit();
-                Keyboard.dismiss();
-              }}
-            >
-              <ArrowUp
-                color={colorScheme === "dark" ? "black" : "white"}
-                size={20}
-                className="h-6 w-6"
-              />
-            </Button>
+            {streaming.isStreaming ? (
+              <Button
+                size="icon"
+                className="android:h-12 android:w-12 rounded-full bg-red-500 dark:bg-red-600"
+                onPress={() => {
+                  onStop?.();
+                  Keyboard.dismiss();
+                }}
+              >
+                <Square
+                  color="white"
+                  size={16}
+                  className="h-4 w-4"
+                  fill="white"
+                />
+              </Button>
+            ) : (
+              <Button
+                size="icon"
+                className="android:h-12 android:w-12 rounded-full bg-black dark:bg-white"
+                onPress={() => {
+                  onSubmit();
+                  Keyboard.dismiss();
+                }}
+                disabled={!input.trim() && selectedImageUris.length === 0}
+              >
+                <ArrowUp
+                  color={colorScheme === "dark" ? "black" : "white"}
+                  size={20}
+                  className="h-6 w-6"
+                />
+              </Button>
+            )}
           </View>
         </Animated.View>
       </KeyboardAvoidingView>

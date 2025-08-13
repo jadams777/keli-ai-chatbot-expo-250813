@@ -1,10 +1,10 @@
-import { generateUUID } from "@/lib/utils";
-import { Redirect, Stack, useNavigation } from "expo-router";
-import { useCallback, useEffect, useRef } from "react";
-import { Pressable, type TextInput, View, ScrollView } from "react-native";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Pressable, TextInput, View, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Redirect, Stack, useNavigation } from "expo-router";
+import { generateUUID } from "@/lib/utils";
 import { fetch } from "expo/fetch";
-import { useChat } from "@ai-sdk/react";
+
 import { LottieLoader } from "@/components/lottie-loader";
 import { ChatInterface } from "@/components/chat-interface";
 import { ChatInput } from "@/components/ui/chat-input";
@@ -14,6 +14,7 @@ import { useStore } from "@/lib/globalStore";
 import { MessageCirclePlusIcon, Menu } from "lucide-react-native";
 import type { Message } from "@ai-sdk/react";
 import Animated, { FadeIn } from "react-native-reanimated";
+import { useAIStreaming } from "../../hooks/useAIStreaming";
 
 type WeatherResult = {
   city: string;
@@ -30,8 +31,14 @@ const HomePage = () => {
     setFocusKeyboard,
     chatId,
     setChatId,
+    streaming,
+    setStreamingState,
+    resetStreamingState,
   } = useStore();
   const inputRef = useRef<TextInput>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const { startStreaming, cancelStreaming, reset: resetStreaming } = useAIStreaming();
 
   // Initialize chatId if not set
   useEffect(() => {
@@ -40,45 +47,68 @@ const HomePage = () => {
     }
   }, []);
 
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit,
-    isLoading,
-    setMessages,
-    append,
-  } = useChat({
-    initialMessages: [],
-    id: chatId?.id,
-    api: `${process.env.EXPO_PUBLIC_API_URL}/api/chat-open`,
-    body: {
-      modelId: "gpt-4o-mini",
-    },
-    onFinish: () => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    },
-    fetch: (url: string, options: RequestInit) => {
-      return fetch(url, {
-        ...options,
-        signal: options.signal,
-        headers: {
-          ...options.headers,
-          "Content-Type": "application/json",
-        },
-      }).catch((error) => {
-        console.error("Fetch error:", error);
-        throw error;
+  const handleSubmit = async () => {
+    if (!input.trim()) return;
+    
+    const userMessage: Message = {
+      id: generateUUID(),
+      role: "user",
+      content: input.trim(),
+    };
+    
+    const assistantMessage: Message = {
+      id: generateUUID(),
+      role: "assistant",
+      content: "",
+    };
+    
+    // Add user message and placeholder assistant message
+    const newMessages = [...messages, userMessage, assistantMessage];
+    setMessages(newMessages);
+    
+    // Set streaming state
+    setStreamingState({
+      isStreaming: true,
+      currentMessageId: assistantMessage.id,
+      streamingText: "",
+      error: null,
+    });
+    
+    // Clear input
+    setInput("");
+    
+    try {
+      await startStreaming({
+        prompt: input.trim()
       });
-    },
-    onError(error) {
-      console.log(">> error is", error.message);
-    },
-  });
+      
+      // Note: The streaming updates should be handled through the useAIStreaming hook's state
+      // This implementation may need to be updated to work with the hook's streaming state
+    } catch (error) {
+      console.error("Streaming error:", error);
+      setStreamingState({
+        isStreaming: false,
+        currentMessageId: null,
+        streamingText: "",
+        error: error instanceof Error ? error.message : "An error occurred",
+      });
+    }
+  };
+  
+  const append = (message: Message) => {
+    setMessages(prev => [...prev, message]);
+  };
 
   const handleNewChat = useCallback(() => {
-    // Reset messages first
+    // Cancel any ongoing streaming
+    if (streaming.isStreaming) {
+      cancelStreaming();
+    }
+    
+    // Reset messages and streaming state
     setMessages([]);
+    resetStreamingState();
+    resetStreaming();
     clearImageUris();
 
     // Small delay to ensure state updates have propagated
@@ -88,12 +118,10 @@ const HomePage = () => {
       inputRef.current?.focus();
       setBottomChatHeightHandler(false);
     }, 100);
-  }, [clearImageUris, setBottomChatHeightHandler, setMessages, setChatId]);
+  }, [clearImageUris, setBottomChatHeightHandler, setChatId, streaming.isStreaming, cancelStreaming, resetStreamingState, resetStreaming]);
 
   const handleTextChange = (text: string) => {
-    handleInputChange({
-      target: { value: text },
-    } as any);
+    setInput(text);
   };
 
   const { bottom } = useSafeAreaInsets();
@@ -105,6 +133,33 @@ const HomePage = () => {
       setMessages([] as Message[]);
     }
   }, [chatId, setMessages]);
+
+  // Update message content with streaming text
+  useEffect(() => {
+    if (streaming.currentMessageId && streaming.streamingText) {
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === streaming.currentMessageId 
+            ? { ...msg, content: streaming.streamingText }
+            : msg
+        )
+      );
+    }
+  }, [streaming.currentMessageId, streaming.streamingText]);
+
+  // Handle streaming completion
+  useEffect(() => {
+    if (!streaming.isStreaming && streaming.currentMessageId && streaming.streamingText) {
+      // Ensure final text is saved to the message
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === streaming.currentMessageId 
+            ? { ...msg, content: streaming.streamingText }
+            : msg
+        )
+      );
+    }
+  }, [streaming.isStreaming, streaming.currentMessageId, streaming.streamingText]);
 
   return (
     <Animated.View
@@ -134,12 +189,21 @@ const HomePage = () => {
         <ChatInterface
           messages={messages}
           scrollViewRef={scrollViewRef}
-          isLoading={isLoading}
+          isLoading={streaming.isStreaming}
+          streamingMessageId={streaming.currentMessageId}
         />
       </ScrollView>
 
       {messages.length === 0 && (
-        <SuggestedActions hasInput={input.length > 0} append={append} />
+        <SuggestedActions 
+        hasInput={!!input} 
+        onSubmit={(message) => {
+          setInput(message);
+          setTimeout(() => {
+            handleSubmit();
+          }, 100);
+        }} 
+      />
       )}
 
       <ChatInput
@@ -148,10 +212,15 @@ const HomePage = () => {
         input={input}
         onChangeText={handleTextChange}
         focusOnMount={false}
+        isStreaming={streaming.isStreaming}
         onSubmit={() => {
           setBottomChatHeightHandler(true);
-          handleSubmit(undefined);
+          handleSubmit();
           clearImageUris();
+        }}
+        onStop={() => {
+          cancelStreaming();
+          resetStreamingState();
         }}
       />
     </Animated.View>

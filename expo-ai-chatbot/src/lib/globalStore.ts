@@ -5,6 +5,19 @@ type ChatIdState = {
   from: "history" | "newChat";
 } | null;
 
+type StreamingState = {
+  isStreaming: boolean;
+  currentMessageId: string | null;
+  streamingText: string;
+  error: string | null;
+};
+
+type AIProviderState = {
+  selectedModel: string;
+  isLocal: boolean;
+  availableProviders: Array<{ name: string; modelName: string; isLocal: boolean }>;
+};
+
 interface StoreState {
   scrollY: number;
   setScrollY: (value: number) => void;
@@ -18,6 +31,14 @@ interface StoreState {
   setChatId: (value: { id: string; from: "history" | "newChat" }) => void;
   setFocusKeyboard: (value: boolean) => void;
   focusKeyboard: boolean;
+  // Streaming state
+  streaming: StreamingState;
+  setStreamingState: (state: Partial<StreamingState>) => void;
+  resetStreamingState: () => void;
+  // AI Provider state
+  aiProvider: AIProviderState;
+  setSelectedModel: (modelName: string, isLocal: boolean) => void;
+  setAvailableProviders: (providers: Array<{ name: string; modelName: string; isLocal: boolean }>) => void;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -42,4 +63,38 @@ export const useStore = create<StoreState>((set) => ({
   setChatId: (value) => set({ chatId: value }),
   focusKeyboard: false,
   setFocusKeyboard: (value: boolean) => set({ focusKeyboard: value }),
+  // Streaming state
+  streaming: {
+    isStreaming: false,
+    currentMessageId: null,
+    streamingText: '',
+    error: null,
+  },
+  setStreamingState: (state: Partial<StreamingState>) =>
+    set((prevState) => ({
+      streaming: { ...prevState.streaming, ...state },
+    })),
+  resetStreamingState: () =>
+    set({
+      streaming: {
+        isStreaming: false,
+        currentMessageId: null,
+        streamingText: '',
+        error: null,
+      },
+    }),
+  // AI Provider state
+  aiProvider: {
+    selectedModel: 'gpt-4o',
+    isLocal: false,
+    availableProviders: [],
+  },
+  setSelectedModel: (modelName: string, isLocal: boolean) =>
+    set((state) => ({
+      aiProvider: { ...state.aiProvider, selectedModel: modelName, isLocal },
+    })),
+  setAvailableProviders: (providers) =>
+    set((state) => ({
+      aiProvider: { ...state.aiProvider, availableProviders: providers },
+    })),
 }));

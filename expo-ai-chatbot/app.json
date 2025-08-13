@@ -1,0 +1,76 @@
+{
+  "expo": {
+    "name": "expo-ai-chatbot-lite",
+    "slug": "expo-ai-chatbot-lite",
+    "scheme": "lite.expoaichatbot.com",
+    "userInterfaceStyle": "automatic",
+    "orientation": "portrait",
+    "version": "0.0.1",
+    "web": {
+      "output": "server",
+      "bundler": "metro"
+    },
+    "assetBundlePatterns": ["src/assets/**/*"],
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "http://localhost:8081"
+        }
+      ],
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          },
+          "android": {
+            "kotlinVersion": "1.6.21"
+          }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "This app needs access to your photos to let you share them.",
+          "cameraPermission": "This app needs access to your camera to let you take photos."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#ffffff",
+          "image": "./src/assets/splash.png",
+          "imageWidth": 200
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "android": {
+      "package": "com.expoaichatbot.lite"
+    },
+    "ios": {
+      "bundleIdentifier": "com.expoaichatbot.lite",
+      "supportsTablet": true
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "owner": "bidah",
+    "extra": {
+      "eas": {
+        "projectId": "b88444bb-597c-4abf-8322-686e6e525a07"
+      }
+    },
+    "icon": "./src/assets/icon.png",
+    "splash": {
+      "image": "./src/assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    }
+  }
+}

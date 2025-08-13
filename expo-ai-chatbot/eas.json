@@ -1,0 +1,80 @@
+{
+  "cli": {
+    "version": ">= 10.2.1"
+  },
+  "build": {
+    "development:emulator": {
+      "distribution": "internal",
+      "developmentClient": true,
+      "channel": "development",
+      "env": {
+        "APP_ENV": "development"
+      },
+      "android": {
+        "buildType": "apk",
+        "image": "latest"
+      }
+    },
+    "development:simulator": {
+      "distribution": "internal",
+      "developmentClient": true,
+      "channel": "development",
+      "env": {
+        "APP_ENV": "development"
+      },
+      "ios": {
+        "simulator": true,
+        "image": "latest"
+      }
+    },
+    "development:device": {
+      "distribution": "internal",
+      "developmentClient": true,
+      "channel": "development",
+      "env": {
+        "APP_ENV": "development"
+      },
+      "ios": {
+        "image": "latest"
+      }
+    },
+    "development": {
+      "distribution": "internal",
+      "channel": "development",
+      "env": {
+        "APP_ENV": "development",
+        "NODE_ENV": "development"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "image": "latest"
+      }
+    },
+    "staging": {
+      "distribution": "store",
+      "channel": "staging",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_ENV": "staging"
+      },
+      "ios": {
+        "image": "latest"
+      },
+      "autoIncrement": true
+    },
+    "production": {
+      "env": {
+        "APP_ENV": "production",
+        "NODE_ENV": "production"
+      },
+      "channel": "production"
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

@@ -5,9 +5,25 @@ import type {
   CoreAssistantMessage,
   ModelMessage,
   CoreToolMessage,
-  UIMessage,
-  ToolInvocation,
 } from "ai";
+
+// Define ToolInvocation interface locally
+interface ToolInvocation {
+  toolCallId: string;
+  toolName: string;
+  args: any;
+  result?: any;
+  state?: 'partial-call' | 'call' | 'result';
+}
+
+// Custom UIMessage interface that matches our usage
+export interface UIMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  toolInvocations?: Array<ToolInvocation>;
+  annotations?: Array<any>;
+}
 
 // Type definitions for database messages
 interface DBMessage {
@@ -99,7 +115,7 @@ function addToolMessageToChat({
             return {
               ...toolInvocation,
               state: "result",
-              result: toolResult.result,
+              result: (toolResult as any).result || toolResult,
             };
           }
 
@@ -247,6 +263,5 @@ export function getMessageIdFromAnnotations(message: UIMessage) {
   const [annotation] = message.annotations;
   if (!annotation) return message.id;
 
-  // @ts-expect-error messageIdFromServer is not defined in MessageAnnotation
-  return annotation.messageIdFromServer;
+  return annotation.messageIdFromServer || message.id;
 }

@@ -1,0 +1,887 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, Pressable, Alert, Platform } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ArrowLeft, Mic, RotateCcw } from 'lucide-react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withRepeat,
+  withTiming,
+  interpolate,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import {
+  useAudioRecorder,
+  AudioModule,
+  useAudioRecorderState,
+  setAudioModeAsync,
+} from 'expo-audio';
+import { useAIStreaming } from '@/hooks/useAIStreaming';
+import { useStore } from '@/lib/globalStore';
+
+// Apple AI module references
+let apple: any = null;
+let AppleSpeech: any = null;
+let experimental_transcribe: any = null;
+let isAppleAIAvailable = false;
+
+// Debug mode flag
+const DEBUG_MODE = true;
+
+// Debug logging utility
+const debugLog = (category: string, message: string, data?: any) => {
+  if (!DEBUG_MODE) return;
+  const timestamp = new Date().toISOString();
+  const prefix = `[VoiceChat:${category}] ${timestamp}`;
+  if (data) {
+    console.log(`${prefix} ${message}`, data);
+  } else {
+    console.log(`${prefix} ${message}`);
+  }
+};
+
+// Performance timing utility
+const performanceTimer = {
+  timers: new Map<string, number>(),
+  start: (name: string) => {
+    const startTime = Date.now();
+    performanceTimer.timers.set(name, startTime);
+    debugLog('Performance', `Timer started: ${name}`);
+    return startTime;
+  },
+  end: (name: string) => {
+    const startTime = performanceTimer.timers.get(name);
+    if (!startTime) {
+      debugLog('Performance', `Timer not found: ${name}`);
+      return 0;
+    }
+    const duration = Date.now() - startTime;
+    debugLog('Performance', `Timer ended: ${name} - Duration: ${duration}ms`);
+    performanceTimer.timers.delete(name);
+    return duration;
+  }
+};
+
+// Memory usage utility
+const logMemoryUsage = (context: string) => {
+  if (typeof global !== 'undefined' && global.gc) {
+    try {
+      global.gc();
+      const memUsage = process.memoryUsage();
+      debugLog('Memory', `${context} - RSS: ${Math.round(memUsage.rss / 1024 / 1024)}MB, Heap Used: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`);
+    } catch (error) {
+      debugLog('Memory', `Failed to get memory usage for ${context}:`, error);
+    }
+  }
+};
+
+// Enhanced function to load Apple AI modules with detailed logging
+const loadAppleAIModules = async () => {
+  performanceTimer.start('loadAppleAIModules');
+  debugLog('Debug', 'Starting Apple AI module loading process');
+  logMemoryUsage('Before module loading');
+  
+  if (Platform.OS !== 'ios') {
+    debugLog('Error', 'Apple AI features only available on iOS devices', { platform: Platform.OS });
+    performanceTimer.end('loadAppleAIModules');
+    return false;
+  }
+  
+  if (isAppleAIAvailable) {
+    debugLog('Debug', 'Apple AI modules already loaded, skipping initialization');
+    performanceTimer.end('loadAppleAIModules');
+    return true;
+  }
+  
+  try {
+    debugLog('Debug', 'Attempting to load Apple AI modules...');
+    
+    // Load @react-native-ai/apple module
+    debugLog('Debug', 'Loading @react-native-ai/apple module...');
+    const appleModuleStart = Date.now();
+    const appleModule = require('@react-native-ai/apple');
+    const appleModuleTime = Date.now() - appleModuleStart;
+    debugLog('Performance', `@react-native-ai/apple module loaded in ${appleModuleTime}ms`);
+    
+    apple = appleModule.apple;
+    AppleSpeech = appleModule.AppleSpeech;
+    
+    debugLog('Debug', 'Apple module components extracted', {
+      hasApple: !!apple,
+      hasAppleSpeech: !!AppleSpeech,
+      appleType: typeof apple,
+      appleSpeechType: typeof AppleSpeech
+    });
+    
+    // Load ai module
+    debugLog('Debug', 'Loading ai module...');
+    const aiModuleStart = Date.now();
+    const aiModule = require('ai');
+    const aiModuleTime = Date.now() - aiModuleStart;
+    debugLog('Performance', `ai module loaded in ${aiModuleTime}ms`);
+    
+    experimental_transcribe = aiModule.experimental_transcribe;
+    
+    debugLog('Debug', 'AI module components extracted', {
+      hasExperimentalTranscribe: !!experimental_transcribe,
+      experimentalTranscribeType: typeof experimental_transcribe
+    });
+    
+    // Validate all required components
+    const missingComponents = [];
+    if (!apple) missingComponents.push('apple');
+    if (!AppleSpeech) missingComponents.push('AppleSpeech');
+    if (!experimental_transcribe) missingComponents.push('experimental_transcribe');
+    
+    if (missingComponents.length > 0) {
+      debugLog('Error', 'Missing required Apple AI components', { missing: missingComponents });
+      performanceTimer.end('loadAppleAIModules');
+      return false;
+    }
+    
+    isAppleAIAvailable = true;
+    logMemoryUsage('After module loading');
+    performanceTimer.end('loadAppleAIModules');
+    debugLog('Debug', 'Apple AI modules loaded successfully');
+    return true;
+  } catch (error) {
+    debugLog('Error', 'Failed to load Apple AI modules', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    logMemoryUsage('After module loading failure');
+    performanceTimer.end('loadAppleAIModules');
+    return false;
+  }
+};
+
+// Reset function to clean up state
+const resetVoiceChatState = (setVoiceState: (state: VoiceState) => void, setStatusText: (text: string) => void, setRecording: (recording: any) => void) => {
+  debugLog('Debug', 'Resetting voice chat state');
+  setVoiceState('idle');
+  setStatusText('Tap and hold to speak');
+  setRecording(null);
+};
+
+type VoiceState = 'idle' | 'recording' | 'transcribing' | 'generating' | 'playing' | 'error';
+
+const VoiceChatScreen = () => {
+  const router = useRouter();
+  const { bottom } = useSafeAreaInsets();
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [statusText, setStatusText] = useState('Tap and hold to speak');
+  const [recording, setRecording] = useState<any>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  // Import RecordingPresets for proper configuration
+  const { RecordingPresets } = require('expo-audio');
+  
+  // Use standard HIGH_QUALITY preset to avoid crashes
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder);
+  const { startStreaming, cancelStreaming } = useAIStreaming();
+  const { streaming } = useStore();
+  
+  // Animation values
+  const buttonScale = useSharedValue(1);
+  const pulseScale = useSharedValue(1);
+  const buttonOpacity = useSharedValue(1);
+  
+  // Request microphone permissions on mount and cleanup on unmount
+  useEffect(() => {
+    const requestPermissions = async () => {
+      try {
+        const { granted } = await AudioModule.requestRecordingPermissionsAsync();
+        if (!granted) {
+          Alert.alert('Permission Required', 'Microphone access is required for voice chat.');
+        }
+      } catch (error) {
+        console.error('Failed to request permissions:', error);
+      }
+    };
+    
+    requestPermissions();
+  }, []);
+  
+  // Configure audio session
+  useEffect(() => {
+    const configureAudio = async () => {
+      try {
+        await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+      });
+      } catch (error) {
+        console.error('Failed to configure audio:', error);
+      }
+    };
+    
+    configureAudio();
+  }, []);
+  
+  const startRecording = async () => {
+    performanceTimer.start('startRecording');
+    debugLog('Debug', 'Starting recording process');
+    logMemoryUsage('Before startRecording');
+    
+    try {
+      debugLog('Debug', 'Requesting recording permissions...');
+      const { granted } = await AudioModule.requestRecordingPermissionsAsync();
+      if (!granted) {
+        debugLog('Error', 'Recording permission denied');
+        Alert.alert('Permission Required', 'Microphone access is required for voice chat.');
+        performanceTimer.end('startRecording');
+        return;
+      }
+      
+      debugLog('Debug', 'Recording permission granted, starting recording...');
+      setVoiceState('recording');
+      setStatusText('Recording... Release to send');
+      
+      // Haptic feedback on start
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      
+      // Start pulse animation
+      pulseScale.value = withRepeat(
+        withTiming(1.2, { duration: 800 }),
+        -1,
+        true
+      );
+      
+      debugLog('Debug', 'Starting audio recorder...');
+      debugLog('Debug', 'Audio recorder configuration', {
+        hasRecorder: !!audioRecorder,
+        recorderState: recorderState,
+        initialUri: audioRecorder?.uri
+      });
+      
+      if (!audioRecorder) {
+        throw new Error('Audio recorder not initialized');
+      }
+      
+      // Check if recorder is ready (remove canRecord check as it doesn't exist in the type)
+      if (!audioRecorder) {
+        throw new Error('Audio recorder not initialized properly');
+      }
+      
+      // Prepare and start recording
+      await audioRecorder.prepareToRecordAsync();
+      performanceTimer.start('audioRecorderStart');
+      await audioRecorder.record();
+      performanceTimer.end('audioRecorderStart');
+      
+      setRecording(audioRecorder);
+      
+      debugLog('Debug', 'Recording started successfully', {
+        hasRecording: !!audioRecorder,
+        recorderState: recorderState,
+        uri: audioRecorder.uri,
+        isRecording: audioRecorder.isRecording
+      });
+      
+      performanceTimer.end('startRecording');
+      logMemoryUsage('After startRecording');
+      
+    } catch (error) {
+      debugLog('Error', 'Failed to start recording', {
+        error: error,
+        errorMessage: error?.message,
+        errorStack: error?.stack,
+        recorderState: recorderState
+      });
+      performanceTimer.end('startRecording');
+      setVoiceState('idle');
+      setStatusText('Failed to start recording');
+    }
+  };
+  
+  const stopRecording = async () => {
+    if (!recording) {
+      debugLog('Error', 'stopRecording called but no recording exists');
+      return;
+    }
+    
+    performanceTimer.start('stopRecording');
+    debugLog('Debug', 'Starting stopRecording process');
+    logMemoryUsage('Before stopRecording');
+    
+    try {
+      debugLog('Debug', 'Stopping audio recording...');
+      // Haptic feedback on release
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      // Stop pulse animation
+      pulseScale.value = withSpring(1);
+      
+      setVoiceState('transcribing');
+      setStatusText('Transcribing...');
+      
+      performanceTimer.start('audioRecorderStop');
+      await audioRecorder.stop();
+      performanceTimer.end('audioRecorderStop');
+      
+      const uri = audioRecorder.uri;
+      setRecording(null);
+      
+      debugLog('Debug', 'Audio recording stopped', {
+        uri: uri,
+        hasUri: !!uri,
+        recorderState: recorderState,
+        isRecording: audioRecorder.isRecording,
+        hasRecorder: !!audioRecorder
+      });
+      
+      // Log detailed URI information
+      if (uri) {
+        debugLog('Debug', 'Recording URI details', {
+          fullUri: uri,
+          uriLength: uri.length,
+          isFileUri: uri.startsWith('file://'),
+          pathPart: uri.replace('file://', ''),
+          extension: uri.split('.').pop()
+        });
+      } else {
+        debugLog('Error', 'No URI generated by audio recorder', {
+          recorderState: recorderState,
+          isRecording: audioRecorder.isRecording,
+          hasRecorder: !!audioRecorder
+        });
+      }
+      
+      if (!uri) {
+        debugLog('Error', 'No recording URI available after stopping recorder');
+        throw new Error('No recording URI available');
+      }
+      
+      // Verify file creation immediately after stopping
+      debugLog('Debug', 'Verifying file creation immediately after stop...');
+      let fileVerified = false;
+      let verificationAttempts = 0;
+      const maxVerificationAttempts = 10;
+      const verificationDelay = 100; // 100ms delay between verification attempts
+      
+      while (!fileVerified && verificationAttempts < maxVerificationAttempts) {
+        try {
+          const immediateFileInfo = await FileSystem.getInfoAsync(uri);
+          debugLog('Debug', `File verification attempt ${verificationAttempts + 1}`, {
+            exists: immediateFileInfo.exists,
+            size: immediateFileInfo.exists ? (immediateFileInfo as any).size : 0,
+            uri: uri
+          });
+          
+          if (immediateFileInfo.exists && (immediateFileInfo as any).size > 0) {
+            fileVerified = true;
+            debugLog('Debug', 'File creation verified successfully', {
+              size: (immediateFileInfo as any).size,
+              sizeInKB: Math.round((immediateFileInfo as any).size / 1024)
+            });
+            break;
+          }
+          
+          verificationAttempts++;
+          if (verificationAttempts < maxVerificationAttempts) {
+            debugLog('Debug', `File not ready yet, waiting ${verificationDelay}ms before verification retry ${verificationAttempts}/${maxVerificationAttempts}`);
+            await new Promise(resolve => setTimeout(resolve, verificationDelay));
+          }
+        } catch (verificationError) {
+          verificationAttempts++;
+          debugLog('Debug', `File verification failed (attempt ${verificationAttempts}/${maxVerificationAttempts})`, {
+            error: verificationError.message
+          });
+          
+          if (verificationAttempts < maxVerificationAttempts) {
+            await new Promise(resolve => setTimeout(resolve, verificationDelay));
+          }
+        }
+      }
+      
+      if (!fileVerified) {
+        debugLog('Error', 'File creation could not be verified after recording stop', {
+          uri: uri,
+          verificationAttempts: verificationAttempts
+        });
+        throw new Error(`Recording file was not created or is empty. URI: ${uri}`);
+      }
+      
+      debugLog('Debug', 'Recording saved and verified successfully', { uri });
+      
+      // Load Apple AI modules
+      debugLog('Debug', 'Loading Apple AI modules for transcription...');
+      const modulesLoaded = await loadAppleAIModules();
+      if (!modulesLoaded) {
+        debugLog('Error', 'Apple AI modules failed to load for transcription');
+        setVoiceState('error');
+        setStatusText('Voice features require iOS device with Apple Intelligence. Tap to retry.');
+        performanceTimer.end('stopRecording');
+        return;
+      }
+      
+      let transcription = '';
+      
+      try {
+        debugLog('Debug', 'Starting transcription process...');
+        performanceTimer.start('transcription');
+        
+        // Read audio file using FileSystem with retry logic
+        debugLog('Debug', 'Reading audio file from URI', { uri });
+        performanceTimer.start('audioFetch');
+        
+        let base64Audio = '';
+        let retryAttempts = 0;
+        const maxRetries = 5;
+        const retryDelay = 200; // 200ms delay between retries
+        
+        while (retryAttempts < maxRetries) {
+          try {
+            // Check if file exists first
+            const fileInfo = await FileSystem.getInfoAsync(uri);
+            debugLog('Debug', `File existence check (attempt ${retryAttempts + 1})`, {
+              exists: fileInfo.exists,
+              size: fileInfo.exists ? (fileInfo as any).size : 0,
+              uri: uri
+            });
+            
+            if (!fileInfo.exists) {
+              debugLog('Debug', `File does not exist yet, waiting ${retryDelay}ms before retry ${retryAttempts + 1}/${maxRetries}`);
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+              retryAttempts++;
+              continue;
+            }
+            
+            if (fileInfo.exists && (fileInfo as any).size === 0) {
+              debugLog('Debug', `File exists but is empty, waiting ${retryDelay}ms before retry ${retryAttempts + 1}/${maxRetries}`);
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+              retryAttempts++;
+              continue;
+            }
+            
+            // File exists and has content, try to read it
+            base64Audio = await FileSystem.readAsStringAsync(uri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            
+            debugLog('Debug', 'Audio file read successfully on attempt', {
+              attempt: retryAttempts + 1,
+              base64Length: base64Audio.length
+            });
+            break;
+            
+          } catch (readError) {
+            retryAttempts++;
+            debugLog('Debug', `File read failed (attempt ${retryAttempts}/${maxRetries})`, {
+              error: readError.message,
+              willRetry: retryAttempts < maxRetries
+            });
+            
+            if (retryAttempts >= maxRetries) {
+              throw new Error(`Failed to read audio file after ${maxRetries} attempts: ${readError.message}`);
+            }
+            
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+          }
+        }
+        
+        performanceTimer.end('audioFetch');
+        
+        debugLog('Debug', 'Audio file read successfully', {
+          base64Length: base64Audio.length,
+          sizeInKB: Math.round(base64Audio.length * 0.75 / 1024), // Approximate size from base64
+        });
+        
+        if (!base64Audio || base64Audio.length === 0) {
+          throw new Error('Failed to read audio file or file is empty');
+        }
+        
+        debugLog('Debug', 'Using base64 audio directly for transcription', {
+          base64Length: base64Audio.length,
+          sizeInKB: Math.round(base64Audio.length * 0.75 / 1024), // Approximate size after base64 decoding
+          sizeInMB: Math.round(base64Audio.length * 0.75 / 1024 / 1024 * 100) / 100
+        });
+        
+        // Prepare transcription model
+        debugLog('Debug', 'Preparing transcription model...');
+        const transcriptionModel = apple.transcriptionModel();
+        debugLog('Debug', 'Transcription model created', {
+          model: transcriptionModel,
+          modelType: typeof transcriptionModel
+        });
+        
+        // Prepare transcription parameters
+        const transcriptionParams = {
+          model: transcriptionModel,
+          audio: base64Audio,
+        };
+        
+        debugLog('Debug', 'Transcription parameters prepared', {
+          hasModel: !!transcriptionParams.model,
+          hasAudio: !!transcriptionParams.audio,
+          audioSize: transcriptionParams.audio.length,
+          modelType: typeof transcriptionParams.model
+        });
+        
+        // Call experimental_transcribe
+        debugLog('Debug', 'Calling experimental_transcribe...');
+        performanceTimer.start('experimentalTranscribe');
+        logMemoryUsage('Before experimental_transcribe');
+        
+        const response = await experimental_transcribe(transcriptionParams);
+        
+        performanceTimer.end('experimentalTranscribe');
+        logMemoryUsage('After experimental_transcribe');
+        
+        debugLog('Debug', 'experimental_transcribe response received', {
+          hasResponse: !!response,
+          responseType: typeof response,
+          responseKeys: response ? Object.keys(response) : []
+        });
+        
+        transcription = response.text;
+        
+        debugLog('Debug', 'Transcription completed successfully', {
+          transcription: transcription,
+          transcriptionLength: transcription?.length || 0,
+          segments: response.segments,
+          segmentCount: response.segments?.length || 0,
+          duration: response.durationInSeconds
+        });
+        
+        performanceTimer.end('transcription');
+        
+      } catch (transcriptionError) {
+        debugLog('Error', 'Transcription failed', {
+          error: transcriptionError,
+          errorMessage: transcriptionError?.message,
+          errorStack: transcriptionError?.stack,
+          errorName: transcriptionError?.name
+        });
+        performanceTimer.end('transcription');
+        setVoiceState('error');
+        setStatusText('Transcription failed. Tap to retry.');
+        performanceTimer.end('stopRecording');
+        return;
+      }
+      
+      debugLog('Debug', 'Validating transcription result', {
+        hasTranscription: !!transcription,
+        transcriptionLength: transcription?.length || 0,
+        isEmpty: !transcription || transcription.trim() === ''
+      });
+      
+      if (!transcription || !transcription.trim()) {
+        debugLog('Error', 'Empty or invalid transcription received', {
+          transcription: transcription,
+          trimmed: transcription?.trim()
+        });
+        setVoiceState('error');
+        setStatusText('No speech detected. Tap to retry.');
+        performanceTimer.end('stopRecording');
+        return;
+      }
+      
+      debugLog('Debug', 'Transcription validation successful', {
+        transcription: transcription,
+        length: transcription.length
+      });
+      
+      // Generate AI response
+      debugLog('Debug', 'Starting AI response generation...');
+      setVoiceState('generating');
+      setStatusText('Thinking...');
+      
+      await startStreaming({
+        prompt: transcription.trim()
+      });
+      
+      performanceTimer.end('stopRecording');
+      logMemoryUsage('After stopRecording completed');
+      
+    } catch (error) {
+      debugLog('Error', 'Critical error in stopRecording', {
+        error: error,
+        errorMessage: error?.message,
+        errorStack: error?.stack,
+        errorName: error?.name,
+        voiceState: voiceState,
+        hasRecording: !!recording
+      });
+      performanceTimer.end('stopRecording');
+      logMemoryUsage('After stopRecording error');
+      setVoiceState('error');
+      setStatusText('Failed to process audio. Tap to retry.');
+      setRecording(null);
+    }
+  };
+  
+  // Retry function for when transcription fails
+  const retryTranscription = () => {
+    debugLog('Debug', 'Retrying transcription', {
+      currentAttempt: retryCount,
+      nextAttempt: retryCount + 1,
+      voiceState: voiceState,
+      hasRecording: !!recording
+    });
+    
+    setRetryCount(prev => prev + 1);
+    resetVoiceChatState(setVoiceState, setStatusText, setRecording);
+    
+    debugLog('Debug', 'Retry transcription completed', {
+      newRetryCount: retryCount + 1
+    });
+  };
+  
+  // Manual reset function
+  const manualReset = () => {
+    debugLog('Debug', 'Manual reset triggered', {
+      currentRetryCount: retryCount,
+      voiceState: voiceState,
+      hasRecording: !!recording
+    });
+    
+    setRetryCount(0);
+    resetVoiceChatState(setVoiceState, setStatusText, setRecording);
+    
+    debugLog('Debug', 'Manual reset completed', {
+      retryCount: 0,
+      voiceState: 'idle'
+    });
+  };
+  
+  // Handle AI streaming completion
+  useEffect(() => {
+    const handleStreamingComplete = async () => {
+      debugLog('Debug', 'Checking streaming completion', {
+        isStreaming: streaming.isStreaming,
+        hasStreamingText: !!streaming.streamingText,
+        streamingTextLength: streaming.streamingText?.length || 0,
+        voiceState: voiceState,
+        shouldProcess: !streaming.isStreaming && streaming.streamingText && voiceState === 'generating'
+      });
+      
+      if (!streaming.isStreaming && streaming.streamingText && voiceState === 'generating') {
+        try {
+          debugLog('Debug', 'Starting speech synthesis process');
+          performanceTimer.start('speechSynthesis');
+          
+          setVoiceState('playing');
+          setStatusText('Speaking...');
+          
+          // Generate speech using Apple's TTS
+          debugLog('Debug', 'Loading Apple AI modules for speech synthesis...');
+          const modulesLoaded = await loadAppleAIModules();
+          
+          debugLog('Debug', 'Apple AI modules loaded for speech', {
+            modulesLoaded: modulesLoaded,
+            hasAppleSpeech: !!AppleSpeech
+          });
+          
+          if (modulesLoaded && AppleSpeech) {
+            debugLog('Debug', 'Generating speech with Apple TTS', {
+              textLength: streaming.streamingText.length,
+              language: 'en-US',
+              voice: 'default'
+            });
+            
+            performanceTimer.start('appleSpeechGenerate');
+            await AppleSpeech.generate(streaming.streamingText, {
+              language: 'en-US',
+              voice: 'default'
+            });
+            performanceTimer.end('appleSpeechGenerate');
+            
+            debugLog('Debug', 'Speech synthesis completed successfully');
+          } else {
+            debugLog('Warning', 'Speech synthesis not available', {
+              modulesLoaded: modulesLoaded,
+              hasAppleSpeech: !!AppleSpeech,
+              reason: 'requires iOS device with Apple Intelligence'
+            });
+          }
+          
+          setVoiceState('idle');
+          setStatusText('Tap and hold to speak');
+          
+          performanceTimer.end('speechSynthesis');
+          debugLog('Debug', 'Speech synthesis process completed');
+          
+        } catch (error) {
+          debugLog('Error', 'Failed to synthesize speech', {
+            error: error,
+            errorMessage: error?.message,
+            errorStack: error?.stack,
+            streamingTextLength: streaming.streamingText?.length || 0
+          });
+          performanceTimer.end('speechSynthesis');
+          setVoiceState('idle');
+          setStatusText('Tap and hold to speak');
+        }
+      }
+    };
+    
+    handleStreamingComplete();
+  }, [streaming.isStreaming, streaming.streamingText, voiceState]);
+  
+  const onPressIn = () => {
+    debugLog('Debug', 'Button press in detected', {
+      voiceState: voiceState,
+      hasRecording: !!recording,
+      retryCount: retryCount
+    });
+    
+    if (voiceState === 'idle') {
+      debugLog('Debug', 'Starting recording from idle state');
+      buttonScale.value = withSpring(0.9);
+      startRecording();
+    } else if (voiceState === 'error') {
+      debugLog('Debug', 'Retrying from error state');
+      buttonScale.value = withSpring(0.9);
+      // Handle retry on error state
+      retryTranscription();
+    } else {
+      debugLog('Debug', 'Button press ignored', {
+        reason: 'invalid state for press in',
+        currentState: voiceState
+      });
+    }
+  };
+  
+  const onPressOut = () => {
+    debugLog('Debug', 'Button press out detected', {
+      voiceState: voiceState,
+      hasRecording: !!recording
+    });
+    
+    if (voiceState === 'recording') {
+      debugLog('Debug', 'Stopping recording from recording state');
+      buttonScale.value = withSpring(1);
+      stopRecording();
+    } else if (voiceState === 'error') {
+      debugLog('Debug', 'Button release in error state');
+      buttonScale.value = withSpring(1);
+    } else {
+      debugLog('Debug', 'Button release ignored', {
+        reason: 'invalid state for press out',
+        currentState: voiceState
+      });
+    }
+  };
+  
+  // Animated styles
+  const buttonAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: buttonScale.value }],
+      opacity: buttonOpacity.value,
+    };
+  });
+  
+  const pulseAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: pulseScale.value }],
+      opacity: interpolate(pulseScale.value, [1, 1.2], [0.3, 0]),
+    };
+  });
+  
+  const getButtonColor = () => {
+    switch (voiceState) {
+      case 'recording':
+        return 'bg-red-500';
+      case 'transcribing':
+      case 'generating':
+        return 'bg-yellow-500';
+      case 'playing':
+        return 'bg-green-500';
+      case 'error':
+        return 'bg-orange-500';
+      default:
+        return 'bg-white';
+    }
+  };
+  
+  const getIconColor = () => {
+    return voiceState === 'idle' ? 'black' : 'white';
+  };
+  
+  return (
+    <View className="flex-1 bg-black" style={{ paddingBottom: bottom }}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: 'Voice Chat',
+          headerStyle: { backgroundColor: 'black' },
+          headerTintColor: 'white',
+          headerLeft: () => (
+            <Pressable onPress={() => router.back()}>
+              <ArrowLeft size={24} color="white" />
+            </Pressable>
+          ),
+        }}
+      />
+      
+      <View className="flex-1 justify-center items-center px-8">
+        {/* Status Text */}
+        <Text className="text-white text-lg text-center mb-12 font-medium">
+          {statusText}
+        </Text>
+        
+        {/* Push-to-Talk Button */}
+        <View className="relative">
+          {/* Pulse Effect (only visible when recording) */}
+          {voiceState === 'recording' && (
+            <Animated.View
+              style={[pulseAnimatedStyle]}
+              className="absolute inset-0 w-32 h-32 rounded-full bg-white"
+            />
+          )}
+          
+          {/* Main Button */}
+          <Animated.View style={buttonAnimatedStyle}>
+            <Pressable
+              onPressIn={onPressIn}
+              onPressOut={onPressOut}
+              disabled={voiceState !== 'idle' && voiceState !== 'recording' && voiceState !== 'error'}
+              className={`w-32 h-32 rounded-full ${getButtonColor()} justify-center items-center shadow-lg`}
+            >
+              <Mic size={48} color={getIconColor()} />
+            </Pressable>
+          </Animated.View>
+        </View>
+        
+        {/* AI Response Display */}
+        {streaming.streamingText && (
+          <View className="mt-12 px-6">
+            <Text className="text-white text-base text-center leading-6">
+              {streaming.streamingText}
+            </Text>
+          </View>
+        )}
+        
+        {/* Manual Reset Button - only show in error state */}
+        {voiceState === 'error' && (
+          <View className="absolute top-20 right-6">
+            <Pressable
+              onPress={manualReset}
+              className="bg-gray-700 p-3 rounded-full"
+            >
+              <RotateCcw size={20} color="white" />
+            </Pressable>
+          </View>
+        )}
+        
+        {/* Instructions */}
+        <View className="absolute bottom-20 left-0 right-0 px-8">
+          <Text className="text-gray-400 text-sm text-center leading-5">
+            {voiceState === 'error' 
+              ? `Retry attempt ${retryCount + 1}. Tap the microphone to retry or the reset button to start over.`
+              : 'Hold the button to record your voice message. Release to send and hear the AI response.'
+            }
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+export default VoiceChatScreen;

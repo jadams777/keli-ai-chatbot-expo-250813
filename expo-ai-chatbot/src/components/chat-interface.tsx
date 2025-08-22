@@ -11,22 +11,10 @@ import { cn } from "@/lib/utils";
 import { LottieLoader } from "@/components/lottie-loader";
 import { useStore } from "@/lib/globalStore";
 
-type ToolInvocation = {
-  toolName: string;
-  toolCallId: string;
-  state: string;
-  result?: any;
-};
-
-type Message = {
-  id: string;
-  role: "user" | "assistant" | "system" | "function" | "data" | "tool";
-  content: string;
-  toolInvocations?: ToolInvocation[];
-};
+import { type UIMessage } from "@/lib/utils";
 
 type ChatInterfaceProps = {
-  messages: Message[];
+  messages: UIMessage[];
   scrollViewRef: React.RefObject<ScrollView>;
   isLoading?: boolean;
   streamingMessageId?: string | null;

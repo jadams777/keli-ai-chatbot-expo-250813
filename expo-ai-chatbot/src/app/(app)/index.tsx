@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Pressable, TextInput, View, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Redirect, Stack, useNavigation } from "expo-router";
-import { generateUUID } from "@/lib/utils";
+import { Redirect, Stack, useNavigation, useRouter } from "expo-router";
+import { generateUUID, type UIMessage } from "@/lib/utils";
 import { fetch } from "expo/fetch";
 
 import { LottieLoader } from "@/components/lottie-loader";
@@ -11,10 +11,9 @@ import { ChatInput } from "@/components/ui/chat-input";
 import { SuggestedActions } from "@/components/suggested-actions";
 import type { ScrollView as GHScrollView } from "react-native-gesture-handler";
 import { useStore } from "@/lib/globalStore";
-import { MessageCirclePlusIcon, Menu } from "lucide-react-native";
-import type { Message } from "@ai-sdk/react";
+import { MessageCirclePlusIcon, Menu, Mic } from "lucide-react-native";
+import { useAIStreaming } from "@/hooks/useAIStreaming";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { useAIStreaming } from "../../hooks/useAIStreaming";
 
 type WeatherResult = {
   city: string;
@@ -25,6 +24,7 @@ type WeatherResult = {
 };
 
 const HomePage = () => {
+  const router = useRouter();
   const {
     clearImageUris,
     setBottomChatHeightHandler,
@@ -36,7 +36,7 @@ const HomePage = () => {
     resetStreamingState,
   } = useStore();
   const inputRef = useRef<TextInput>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<UIMessage[]>([]);
   const [input, setInput] = useState("");
   const { startStreaming, cancelStreaming, reset: resetStreaming } = useAIStreaming();
 
@@ -50,13 +50,13 @@ const HomePage = () => {
   const handleSubmit = async () => {
     if (!input.trim()) return;
     
-    const userMessage: Message = {
+    const userMessage: UIMessage = {
       id: generateUUID(),
       role: "user",
       content: input.trim(),
     };
     
-    const assistantMessage: Message = {
+    const assistantMessage: UIMessage = {
       id: generateUUID(),
       role: "assistant",
       content: "",
@@ -95,7 +95,7 @@ const HomePage = () => {
     }
   };
   
-  const append = (message: Message) => {
+  const append = (message: UIMessage) => {
     setMessages(prev => [...prev, message]);
   };
 
@@ -130,7 +130,7 @@ const HomePage = () => {
   // Reset messages when chatId changes
   useEffect(() => {
     if (chatId) {
-      setMessages([] as Message[]);
+      setMessages([] as UIMessage[]);
     }
   }, [chatId, setMessages]);
 
@@ -171,7 +171,14 @@ const HomePage = () => {
         options={{
           headerShown: true,
           title: "hey",
-
+          headerLeft: () => (
+            <Pressable onPress={() => router.push('/voice-chat')}>
+              <Mic
+                size={20}
+                color="black"
+              />
+            </Pressable>
+          ),
           headerRight: () => (
             <Pressable disabled={!messages.length} onPress={handleNewChat}>
               <MessageCirclePlusIcon

@@ -53,10 +53,10 @@
       "typedRoutes": true
     },
     "android": {
-      "package": "com.expoaichatbot.lite"
+      "package": "com.keliaiexpochatbot.lite"
     },
     "ios": {
-      "bundleIdentifier": "com.expoaichatbot.lite",
+      "bundleIdentifier": "com.keliaiexpochatbot.lite",
       "supportsTablet": true,
       "deploymentTarget": "26.0",
       "infoPlist": {

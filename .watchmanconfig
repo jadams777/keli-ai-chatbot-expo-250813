@@ -1,0 +1,24 @@
+{
+  "fsevents_latency": 0.1,
+  "settle": 20,
+  "ignore_dirs": [
+    "expo-ai-chatbot/node_modules/@tabler/icons",
+    "expo-ai-chatbot/node_modules/@heroicons",
+    "expo-ai-chatbot/node_modules/@fortawesome",
+    "expo-ai-chatbot/node_modules/react-icons",
+    "expo-ai-chatbot/node_modules/lucide-react",
+    "expo-ai-chatbot/node_modules/@phosphor-icons",
+    "expo-ai-chatbot/node_modules/feather-icons",
+    "expo-ai-chatbot/node_modules/requireg",
+    "**/node_modules/**/test",
+    "**/node_modules/**/tests",
+    "**/node_modules/**/__tests__",
+    "**/node_modules/**/fixtures",
+    "**/node_modules/**/.cache",
+    "**/node_modules/**/build",
+    "**/node_modules/**/dist",
+    "**/test/fixtures/**/node_modules",
+    "**/tests/fixtures/**/node_modules",
+    "**/__tests__/fixtures/**/node_modules"
+  ]
+}

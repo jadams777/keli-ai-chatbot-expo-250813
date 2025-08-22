@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, Alert, Platform } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,13 +18,14 @@ import {
   AudioModule,
   useAudioRecorderState,
   setAudioModeAsync,
+  useAudioPlayer,
 } from 'expo-audio';
 import { useAIStreaming } from '@/hooks/useAIStreaming';
 import { useStore } from '@/lib/globalStore';
+import { experimental_generateSpeech } from 'ai';
 
 // Apple AI module references
 let apple: any = null;
-let AppleSpeech: any = null;
 let experimental_transcribe: any = null;
 let isAppleAIAvailable = false;
 
@@ -107,13 +108,21 @@ const loadAppleAIModules = async () => {
     debugLog('Performance', `@react-native-ai/apple module loaded in ${appleModuleTime}ms`);
     
     apple = appleModule.apple;
-    AppleSpeech = appleModule.AppleSpeech;
+    
+    // Validate apple object
+    if (apple) {
+      debugLog('Debug', 'Apple object inspection', {
+        appleType: typeof apple,
+        appleMethods: Object.getOwnPropertyNames(apple),
+        applePrototype: Object.getOwnPropertyNames(Object.getPrototypeOf(apple)),
+        hasSpeechModel: typeof apple.speechModel,
+        hasTranscriptionModel: typeof apple.transcriptionModel
+      });
+    }
     
     debugLog('Debug', 'Apple module components extracted', {
       hasApple: !!apple,
-      hasAppleSpeech: !!AppleSpeech,
-      appleType: typeof apple,
-      appleSpeechType: typeof AppleSpeech
+      appleType: typeof apple
     });
     
     // Load ai module
@@ -133,7 +142,6 @@ const loadAppleAIModules = async () => {
     // Validate all required components
     const missingComponents = [];
     if (!apple) missingComponents.push('apple');
-    if (!AppleSpeech) missingComponents.push('AppleSpeech');
     if (!experimental_transcribe) missingComponents.push('experimental_transcribe');
     
     if (missingComponents.length > 0) {
@@ -173,9 +181,16 @@ const VoiceChatScreen = () => {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const voiceStateRef = React.useRef(voiceState);
+  voiceStateRef.current = voiceState;
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [statusText, setStatusText] = useState('Tap and hold to speak');
   const [recording, setRecording] = useState<any>(null);
   const [retryCount, setRetryCount] = useState(0);
+  
+  // Audio player for TTS playback
+  const audioPlayer = useAudioPlayer();
+
   // Import RecordingPresets for proper configuration
   const { RecordingPresets } = require('expo-audio');
   
@@ -658,10 +673,10 @@ const VoiceChatScreen = () => {
         hasStreamingText: !!streaming.streamingText,
         streamingTextLength: streaming.streamingText?.length || 0,
         voiceState: voiceState,
-        shouldProcess: !streaming.isStreaming && streaming.streamingText && voiceState === 'generating'
+        shouldProcess: !streaming.isStreaming && streaming.streamingText && voiceStateRef.current === 'generating'
       });
       
-      if (!streaming.isStreaming && streaming.streamingText && voiceState === 'generating') {
+      if (!streaming.isStreaming && streaming.streamingText && voiceStateRef.current === 'generating') {
         try {
           debugLog('Debug', 'Starting speech synthesis process');
           performanceTimer.start('speechSynthesis');
@@ -675,34 +690,146 @@ const VoiceChatScreen = () => {
           
           debugLog('Debug', 'Apple AI modules loaded for speech', {
             modulesLoaded: modulesLoaded,
-            hasAppleSpeech: !!AppleSpeech
+            hasApple: !!apple,
+            hasSpeechModel: apple ? typeof apple.speechModel : 'undefined'
           });
           
-          if (modulesLoaded && AppleSpeech) {
+          if (modulesLoaded && apple && apple.speechModel) {
             debugLog('Debug', 'Generating speech with Apple TTS', {
               textLength: streaming.streamingText.length,
-              language: 'en-US',
-              voice: 'default'
+              text: streaming.streamingText.substring(0, 100) + '...'
             });
             
             performanceTimer.start('appleSpeechGenerate');
-            await AppleSpeech.generate(streaming.streamingText, {
-              language: 'en-US',
-              voice: 'default'
+            const result = await experimental_generateSpeech({
+              model: apple.speechModel(),
+              text: streaming.streamingText,
             });
             performanceTimer.end('appleSpeechGenerate');
             
-            debugLog('Debug', 'Speech synthesis completed successfully');
+            debugLog('Debug', 'Speech synthesis completed successfully', {
+              hasResult: !!result,
+              hasAudio: !!result?.audio,
+              hasUint8Array: !!result?.audio?.uint8Array
+            });
+            
+            // Implement audio playback with result.audio.uint8Array.buffer
+            if (result?.audio?.uint8Array) {
+              try {
+                if (!audioPlayer) {
+                  debugLog('Error', 'audioPlayer is not available');
+                  setVoiceState('error');
+                  setStatusText('Failed to play audio.');
+                  return;
+                }
+                setVoiceState('playing');
+                setStatusText('Playing response...');
+                
+                debugLog('Debug', 'Starting audio playback', {
+                  audioDataLength: result.audio.uint8Array.length,
+                  audioDataType: typeof result.audio.uint8Array
+                });
+                
+                // Write audio data to temporary file (React Native compatible approach)
+                const tempFileName = `tts_audio_${Date.now()}.wav`;
+                const tempFilePath = `${FileSystem.cacheDirectory}${tempFileName}`;
+                
+                // Convert uint8Array to base64 for FileSystem.writeAsStringAsync
+                // Process in chunks to avoid stack overflow with large arrays
+                const chunkSize = 8192; // Process 8KB at a time
+                let binaryString = '';
+                const uint8Array = result.audio.uint8Array;
+                for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                  const chunk = uint8Array.subarray(i, i + chunkSize);
+                  binaryString += String.fromCharCode.apply(null, chunk);
+                }
+                const base64Audio = btoa(binaryString);
+                
+                debugLog('Debug', 'Writing audio to temporary file', {
+                  tempFilePath: tempFilePath,
+                  base64Length: base64Audio.length
+                });
+                
+                await FileSystem.writeAsStringAsync(tempFilePath, base64Audio, {
+                  encoding: FileSystem.EncodingType.Base64
+                });
+                
+                debugLog('Debug', 'Audio file written successfully', {
+                  filePath: tempFilePath
+                });
+                
+                // Load and play the audio file
+                audioPlayer.replace(tempFilePath);
+                debugLog('Debug', 'Audio player status before play', { status: audioPlayer.status });
+                audioPlayer.play();
+                
+                debugLog('Debug', 'Audio playback started', {
+                  filePath: tempFilePath
+                });
+                
+                // Clean up temporary file after playback
+                const cleanupTempFile = async () => {
+                  try {
+                    const fileInfo = await FileSystem.getInfoAsync(tempFilePath);
+                    if (fileInfo.exists) {
+                      await FileSystem.deleteAsync(tempFilePath);
+                      debugLog('Debug', 'Temporary audio file cleaned up', {
+                        filePath: tempFilePath
+                      });
+                    }
+                  } catch (cleanupError) {
+                    debugLog('Warning', 'Failed to cleanup temporary audio file', {
+                      error: cleanupError,
+                      filePath: tempFilePath
+                    });
+                  }
+                };
+                
+                // Note: expo-audio doesn't have the same event system as expo-av
+                // We'll use a calculated timeout as a fallback
+                const words = streaming.streamingText.trim().split(/\s+/).length;
+                const wordsPerMinute = 150;
+                const durationInMs = (words / (wordsPerMinute / 60)) * 1000;
+                const buffer = 2000; // 2 second buffer
+                const timeoutDuration = durationInMs + buffer;
+
+                debugLog('Debug', 'Setting playback timeout', { duration: timeoutDuration, words: words });
+
+                if (timeoutRef.current) {
+                  clearTimeout(timeoutRef.current);
+                }
+
+                timeoutRef.current = setTimeout(async () => {
+                  debugLog('Debug', 'Playback timeout callback fired');
+                  if (voiceStateRef.current === 'playing') {
+                    debugLog('Debug', 'Audio playback timeout reached');
+                    setVoiceState('idle');
+                    setStatusText('Tap and hold to speak');
+                    await cleanupTempFile();
+                  }
+                }, timeoutDuration);
+                
+              } catch (audioError) {
+                debugLog('Error', 'Failed to play audio', {
+                  error: audioError,
+                  errorMessage: audioError?.message,
+                  errorStack: audioError?.stack
+                });
+                setVoiceState('idle');
+                setStatusText('Tap and hold to speak');
+              }
+            } else {
+              debugLog('Warning', 'No audio data available for playback');
+            }
+            
           } else {
             debugLog('Warning', 'Speech synthesis not available', {
               modulesLoaded: modulesLoaded,
-              hasAppleSpeech: !!AppleSpeech,
+              hasApple: !!apple,
+              hasSpeechModel: apple ? typeof apple.speechModel : 'undefined',
               reason: 'requires iOS device with Apple Intelligence'
             });
           }
-          
-          setVoiceState('idle');
-          setStatusText('Tap and hold to speak');
           
           performanceTimer.end('speechSynthesis');
           debugLog('Debug', 'Speech synthesis process completed');
@@ -722,7 +849,13 @@ const VoiceChatScreen = () => {
     };
     
     handleStreamingComplete();
-  }, [streaming.isStreaming, streaming.streamingText, voiceState]);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [streaming.isStreaming, streaming.streamingText]);
   
   const onPressIn = () => {
     debugLog('Debug', 'Button press in detected', {

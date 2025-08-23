@@ -14,7 +14,7 @@ import { useStore } from "@/lib/globalStore";
 import { MessageCirclePlusIcon, Menu, Mic } from "lucide-react-native";
 import { useAIStreaming } from "@/hooks/useAIStreaming";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { useColorScheme } from "@/lib/useColorScheme.tsx";
+import { useColorScheme } from "@/lib/useColorScheme";
 
 type WeatherResult = {
   city: string;

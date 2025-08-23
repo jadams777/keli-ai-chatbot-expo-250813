@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, Pressable, Alert, Platform, ScrollView } from 'react-native';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Mic, RotateCcw, X } from 'lucide-react-native';
+import { ArrowLeft, Mic, RotateCcw, X, Settings } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import Animated, {
   useSharedValue,
@@ -22,7 +23,7 @@ import {
 } from 'expo-audio';
 import { useAIStreaming } from '@/hooks/useAIStreaming';
 import { useStore } from '@/lib/globalStore';
-import { experimental_generateSpeech } from 'ai';
+import { AppleSpeech } from '@react-native-ai/apple';
 
 // Apple AI module references
 let apple: any = null;
@@ -115,7 +116,6 @@ const loadAppleAIModules = async () => {
         appleType: typeof apple,
         appleMethods: Object.getOwnPropertyNames(apple),
         applePrototype: Object.getOwnPropertyNames(Object.getPrototypeOf(apple)),
-        hasSpeechModel: typeof apple.speechModel,
         hasTranscriptionModel: typeof apple.transcriptionModel
       });
     }
@@ -165,6 +165,21 @@ const loadAppleAIModules = async () => {
     performanceTimer.end('loadAppleAIModules');
     return false;
   }
+};
+
+// Function to load selected voice preference from AsyncStorage
+const loadSelectedVoice = async () => {
+  try {
+    const selectedVoiceJson = await AsyncStorage.getItem('selectedVoice');
+    if (selectedVoiceJson) {
+      const selectedVoice = JSON.parse(selectedVoiceJson);
+      debugLog('Debug', 'Loaded selected voice from storage', selectedVoice);
+      return selectedVoice;
+    }
+  } catch (error) {
+    debugLog('Warning', 'Failed to load selected voice from storage', { error: error.message });
+  }
+  return null;
 };
 
 // Reset function to clean up state
@@ -729,27 +744,86 @@ const VoiceChatScreen = () => {
             hasSpeechModel: apple ? typeof apple.speechModel : 'undefined'
           });
           
-          if (modulesLoaded && apple && apple.speechModel) {
+          if (modulesLoaded && Platform.OS === 'ios') {
             debugLog('Debug', 'Generating speech with Apple TTS', {
               textLength: streaming.streamingText.length,
               text: streaming.streamingText.substring(0, 100) + '...'
             });
             
             performanceTimer.start('appleSpeechGenerate');
-            const result = await experimental_generateSpeech({
-              model: apple.speechModel(),
-              text: streaming.streamingText,
-            });
+            
+            // Generate speech using AppleSpeech with selected voice from settings
+            let result;
+            try {
+              // Load selected voice from AsyncStorage
+              const selectedVoice = await loadSelectedVoice();
+              
+              if (selectedVoice) {
+                debugLog('Debug', 'Using selected voice from settings', {
+                  voiceId: selectedVoice.identifier,
+                  quality: selectedVoice.quality,
+                  language: selectedVoice.language,
+                  name: selectedVoice.name
+                });
+                
+                result = await AppleSpeech.generate(streaming.streamingText, {
+                  voice: selectedVoice.identifier,
+                  language: selectedVoice.language
+                });
+              } else {
+                // Fallback to automatic voice selection if no preference saved
+                debugLog('Debug', 'No voice preference found, using automatic selection');
+                const availableVoices = await AppleSpeech.getVoices();
+                
+                // Filter for English voices and prioritize by quality
+                const englishVoices = availableVoices.filter(voice => 
+                  voice.language?.startsWith('en') || voice.identifier?.includes('en-US')
+                );
+                
+                // Find premium voice first, then enhanced, then default
+                const premiumVoice = englishVoices.find(voice => 
+                  voice.quality === 'premium' || voice.identifier?.includes('premium')
+                );
+                const enhancedVoice = englishVoices.find(voice => 
+                  voice.quality === 'enhanced' || voice.identifier?.includes('enhanced')
+                );
+                
+                const fallbackVoice = premiumVoice || enhancedVoice;
+                
+                if (fallbackVoice) {
+                  debugLog('Debug', 'Using fallback high-quality voice', {
+                    voiceId: fallbackVoice.identifier,
+                    quality: fallbackVoice.quality,
+                    language: fallbackVoice.language,
+                    name: fallbackVoice.name
+                  });
+                  
+                  result = await AppleSpeech.generate(streaming.streamingText, {
+                    voice: fallbackVoice.identifier,
+                    language: fallbackVoice.language
+                  });
+                } else {
+                  debugLog('Debug', 'No premium/enhanced voices found, using default');
+                  result = await AppleSpeech.generate(streaming.streamingText);
+                }
+              }
+            } catch (voiceError) {
+              debugLog('Warning', 'Failed to configure voice, using default', {
+                error: voiceError?.message
+              });
+              result = await AppleSpeech.generate(streaming.streamingText);
+            }
             performanceTimer.end('appleSpeechGenerate');
             
             debugLog('Debug', 'Speech synthesis completed successfully', {
               hasResult: !!result,
-              hasAudio: !!result?.audio,
-              hasUint8Array: !!result?.audio?.uint8Array
+              resultType: typeof result,
+              isArrayBuffer: result instanceof ArrayBuffer,
+              resultLength: result?.byteLength || 0
             });
             
-            // Implement audio playback with result.audio.uint8Array.buffer
-            if (result?.audio?.uint8Array) {
+            // Implement audio playback with ArrayBuffer from AppleSpeech.generate()
+            if (result && result instanceof ArrayBuffer) {
               try {
                 const audioPlayer = createAudioPlayer();
                 audioPlayerRef.current = audioPlayer;
@@ -758,8 +832,8 @@ const VoiceChatScreen = () => {
                 setStatusText('Playing response...');
 
                 debugLog('Debug', 'Starting audio playback', {
-                  audioDataLength: result.audio.uint8Array.length,
-                  audioDataType: typeof result.audio.uint8Array
+                  audioDataLength: result.byteLength,
+                  audioDataType: typeof result
                 });
                 
                 const tempFileName = `tts_audio_${Date.now()}.wav`;
@@ -767,7 +841,7 @@ const VoiceChatScreen = () => {
                 
                 const chunkSize = 8192;
                 let binaryString = '';
-                const uint8Array = result.audio.uint8Array;
+                const uint8Array = new Uint8Array(result);
                 for (let i = 0; i < uint8Array.length; i += chunkSize) {
                   const chunk = uint8Array.subarray(i, i + chunkSize);
                   binaryString += String.fromCharCode.apply(null, chunk);
@@ -847,7 +921,7 @@ const VoiceChatScreen = () => {
             debugLog('Warning', 'Speech synthesis not available', {
               modulesLoaded: modulesLoaded,
               hasApple: !!apple,
-              hasSpeechModel: apple ? typeof apple.speechModel : 'undefined',
+              platform: Platform.OS,
               reason: 'requires iOS device with Apple Intelligence'
             });
           }
@@ -974,6 +1048,11 @@ const VoiceChatScreen = () => {
               <ArrowLeft size={24} color="white" />
             </Pressable>
           ),
+          headerRight: () => (
+            <Pressable onPress={() => router.push('/voice-settings')}>
+              <Settings size={24} color="white" />
+            </Pressable>
+          ),
         }}
       />
       
@@ -984,8 +1063,8 @@ const VoiceChatScreen = () => {
             {statusText}
           </Text>
           
-          <View className="flex-row items-center justify-center">
-            {/* Push-to-Talk Button */}
+          <View className="items-center justify-center relative">
+            {/* Push-to-Talk Button - Always Centered */}
             <View className="relative">
               {/* Pulse Effect (only visible when recording) */}
               {voiceState === 'recording' && (
@@ -1008,11 +1087,12 @@ const VoiceChatScreen = () => {
               </Animated.View>
             </View>
 
-            {/* Stop Playback Button */}
+            {/* Stop Playback Button - Positioned to the right */}
             {voiceState === 'playing' && (
               <Pressable
                 onPress={stopPlayback}
-                className="ml-8 bg-red-500 w-16 h-16 rounded-full justify-center items-center"
+                className="absolute bg-red-500 w-16 h-16 rounded-full justify-center items-center"
+                style={{ left: 150 }}
               >
                 <X size={32} color="white" />
               </Pressable>

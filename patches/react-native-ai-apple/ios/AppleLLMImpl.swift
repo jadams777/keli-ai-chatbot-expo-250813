@@ -8,6 +8,7 @@
 
 import Foundation
 import React
+import AVFoundation
 
 #if canImport(FoundationModels)
 import FoundationModels
@@ -167,6 +168,124 @@ public class AppleLLMImpl: NSObject {
     if let task = streamTasks[streamIdString] {
       task.cancel()
       streamTasks.removeValue(forKey: streamIdString)
+    }
+  }
+  
+  // MARK: - Voice Synthesis Methods
+  
+  @objc
+  public func getAvailableVoices() -> [[String: Any]] {
+    let voices = AVSpeechSynthesisVoice.speechVoices()
+    
+    return voices.map { voice in
+      var voiceDict: [String: Any] = [
+        "identifier": voice.identifier,
+        "name": voice.name,
+        "language": voice.language
+      ]
+      
+      // Map quality enum to string
+      switch voice.quality {
+      case .default:
+        voiceDict["quality"] = "default"
+      case .enhanced:
+        voiceDict["quality"] = "enhanced"
+      case .premium:
+        voiceDict["quality"] = "premium"
+      @unknown default:
+        voiceDict["quality"] = "default"
+      }
+      
+      return voiceDict
+    }
+  }
+  
+  @objc
+  public func getVoicesByQuality(_ quality: String) -> [[String: Any]] {
+    let voices = AVSpeechSynthesisVoice.speechVoices()
+    
+    let targetQuality: AVSpeechSynthesisVoiceQuality
+    switch quality.lowercased() {
+    case "premium":
+      targetQuality = .premium
+    case "enhanced":
+      targetQuality = .enhanced
+    default:
+      targetQuality = .default
+    }
+    
+    let filteredVoices = voices.filter { $0.quality == targetQuality }
+    
+    return filteredVoices.map { voice in
+      return [
+        "identifier": voice.identifier,
+        "name": voice.name,
+        "language": voice.language,
+        "quality": quality.lowercased()
+      ]
+    }
+  }
+  
+  @objc
+  public func getBestAvailableVoices() -> [[String: Any]] {
+    let voices = AVSpeechSynthesisVoice.speechVoices()
+    
+    // Group voices by language
+    var voicesByLanguage: [String: [AVSpeechSynthesisVoice]] = [:]
+    
+    for voice in voices {
+      if voicesByLanguage[voice.language] == nil {
+        voicesByLanguage[voice.language] = []
+      }
+      voicesByLanguage[voice.language]?.append(voice)
+    }
+    
+    // For each language, select the best quality voice available
+    var bestVoices: [AVSpeechSynthesisVoice] = []
+    
+    for (_, languageVoices) in voicesByLanguage {
+      // Sort by quality priority: premium > enhanced > default
+      let sortedVoices = languageVoices.sorted { voice1, voice2 in
+        let priority1 = getQualityPriority(voice1.quality)
+        let priority2 = getQualityPriority(voice2.quality)
+        return priority1 > priority2
+      }
+      
+      if let bestVoice = sortedVoices.first {
+        bestVoices.append(bestVoice)
+      }
+    }
+    
+    return bestVoices.map { voice in
+      var qualityString: String
+      switch voice.quality {
+      case .premium:
+        qualityString = "premium"
+      case .enhanced:
+        qualityString = "enhanced"
+      default:
+        qualityString = "default"
+      }
+      
+      return [
+        "identifier": voice.identifier,
+        "name": voice.name,
+        "language": voice.language,
+        "quality": qualityString
+      ]
+    }
+  }
+  
+  private func getQualityPriority(_ quality: AVSpeechSynthesisVoiceQuality) -> Int {
+    switch quality {
+    case .premium:
+      return 3
+    case .enhanced:
+      return 2
+    case .default:
+      return 1
+    @unknown default:
+      return 0
     }
   }
   

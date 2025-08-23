@@ -18,7 +18,7 @@ import {
   AudioModule,
   useAudioRecorderState,
   setAudioModeAsync,
-  useAudioPlayer,
+  createAudioPlayer,
 } from 'expo-audio';
 import { useAIStreaming } from '@/hooks/useAIStreaming';
 import { useStore } from '@/lib/globalStore';
@@ -184,12 +184,12 @@ const VoiceChatScreen = () => {
   const voiceStateRef = React.useRef(voiceState);
   voiceStateRef.current = voiceState;
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const [statusText, setStatusText] = useState('Tap and hold to speak');
   const [recording, setRecording] = useState<any>(null);
   const [retryCount, setRetryCount] = useState(0);
   
-  // Audio player for TTS playback
-  const audioPlayer = useAudioPlayer();
+  
 
   // Import RecordingPresets for proper configuration
   const { RecordingPresets } = require('expo-audio');
@@ -716,27 +716,20 @@ const VoiceChatScreen = () => {
             // Implement audio playback with result.audio.uint8Array.buffer
             if (result?.audio?.uint8Array) {
               try {
-                if (!audioPlayer) {
-                  debugLog('Error', 'audioPlayer is not available');
-                  setVoiceState('error');
-                  setStatusText('Failed to play audio.');
-                  return;
-                }
+                const audioPlayer = createAudioPlayer();
+
                 setVoiceState('playing');
                 setStatusText('Playing response...');
-                
+
                 debugLog('Debug', 'Starting audio playback', {
                   audioDataLength: result.audio.uint8Array.length,
                   audioDataType: typeof result.audio.uint8Array
                 });
                 
-                // Write audio data to temporary file (React Native compatible approach)
                 const tempFileName = `tts_audio_${Date.now()}.wav`;
                 const tempFilePath = `${FileSystem.cacheDirectory}${tempFileName}`;
                 
-                // Convert uint8Array to base64 for FileSystem.writeAsStringAsync
-                // Process in chunks to avoid stack overflow with large arrays
-                const chunkSize = 8192; // Process 8KB at a time
+                const chunkSize = 8192;
                 let binaryString = '';
                 const uint8Array = result.audio.uint8Array;
                 for (let i = 0; i < uint8Array.length; i += chunkSize) {
@@ -758,16 +751,13 @@ const VoiceChatScreen = () => {
                   filePath: tempFilePath
                 });
                 
-                // Load and play the audio file
-                audioPlayer.replace(tempFilePath);
-                debugLog('Debug', 'Audio player status before play', { status: audioPlayer.status });
+                await audioPlayer.replace(tempFilePath);
                 audioPlayer.play();
                 
                 debugLog('Debug', 'Audio playback started', {
                   filePath: tempFilePath
                 });
                 
-                // Clean up temporary file after playback
                 const cleanupTempFile = async () => {
                   try {
                     const fileInfo = await FileSystem.getInfoAsync(tempFilePath);
@@ -785,29 +775,23 @@ const VoiceChatScreen = () => {
                   }
                 };
                 
-                // Note: expo-audio doesn't have the same event system as expo-av
-                // We'll use a calculated timeout as a fallback
-                const words = streaming.streamingText.trim().split(/\s+/).length;
-                const wordsPerMinute = 150;
-                const durationInMs = (words / (wordsPerMinute / 60)) * 1000;
-                const buffer = 2000; // 2 second buffer
-                const timeoutDuration = durationInMs + buffer;
-
-                debugLog('Debug', 'Setting playback timeout', { duration: timeoutDuration, words: words });
-
-                if (timeoutRef.current) {
-                  clearTimeout(timeoutRef.current);
+                if (intervalRef.current) {
+                  clearInterval(intervalRef.current);
                 }
-
-                timeoutRef.current = setTimeout(async () => {
-                  debugLog('Debug', 'Playback timeout callback fired');
-                  if (voiceStateRef.current === 'playing') {
-                    debugLog('Debug', 'Audio playback timeout reached');
-                    setVoiceState('idle');
-                    setStatusText('Tap and hold to speak');
-                    await cleanupTempFile();
+                intervalRef.current = setInterval(async () => {
+                  if (audioPlayer && audioPlayer.duration > 0 && audioPlayer.currentTime >= audioPlayer.duration) {
+                    clearInterval(intervalRef.current);
+                    if (voiceStateRef.current === 'playing') {
+                      debugLog('Debug', 'Audio playback finished');
+                      setVoiceState('idle');
+                      setStatusText('Tap and hold to speak');
+                      await cleanupTempFile();
+                      if (audioPlayer.isLoaded) {
+                        audioPlayer.remove();
+                      }
+                    }
                   }
-                }, timeoutDuration);
+                }, 250);
                 
               } catch (audioError) {
                 debugLog('Error', 'Failed to play audio', {
@@ -853,6 +837,9 @@ const VoiceChatScreen = () => {
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
       }
     };
   }, [streaming.isStreaming, streaming.streamingText]);

@@ -14,6 +14,7 @@ import { useStore } from "@/lib/globalStore";
 import { MessageCirclePlusIcon, Menu, Mic } from "lucide-react-native";
 import { useAIStreaming } from "@/hooks/useAIStreaming";
 import Animated, { FadeIn } from "react-native-reanimated";
+import { useColorScheme } from "@/lib/useColorScheme.tsx";
 
 type WeatherResult = {
   city: string;
@@ -25,6 +26,7 @@ type WeatherResult = {
 
 const HomePage = () => {
   const router = useRouter();
+  const { isDarkColorScheme } = useColorScheme();
   const {
     clearImageUris,
     setBottomChatHeightHandler,
@@ -175,7 +177,7 @@ const HomePage = () => {
             <Pressable onPress={() => router.push('/voice-chat')}>
               <Mic
                 size={20}
-                color="black"
+                color={isDarkColorScheme ? "white" : "black"}
               />
             </Pressable>
           ),
@@ -183,7 +185,7 @@ const HomePage = () => {
             <Pressable disabled={!messages.length} onPress={handleNewChat}>
               <MessageCirclePlusIcon
                 size={20}
-                color={!messages.length ? "#eee" : "black"}
+                color={!messages.length ? (isDarkColorScheme ? "#666" : "#eee") : (isDarkColorScheme ? "white" : "black")}
               />
             </Pressable>
           ),

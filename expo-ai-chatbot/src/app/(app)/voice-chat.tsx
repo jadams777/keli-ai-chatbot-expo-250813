@@ -180,6 +180,7 @@ type VoiceState = 'idle' | 'recording' | 'transcribing' | 'generating' | 'playin
 const VoiceChatScreen = () => {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
+  const { resetStreamingState } = useStore();
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const voiceStateRef = React.useRef(voiceState);
   voiceStateRef.current = voiceState;
@@ -259,6 +260,7 @@ const VoiceChatScreen = () => {
     useCallback(() => {
       return () => {
         stopPlayback();
+        reset();
       };
     }, [stopPlayback])
   );
@@ -657,38 +659,41 @@ const VoiceChatScreen = () => {
     }
   };
   
+  // Reset function
+  const reset = () => {
+    debugLog('Debug', 'Resetting component state', {
+      currentRetryCount: retryCount,
+      voiceState: voiceState,
+      hasRecording: !!recording,
+    });
+
+    setRetryCount(0);
+    resetVoiceChatState(setVoiceState, setStatusText, setRecording);
+    resetStreamingState();
+
+    debugLog('Debug', 'Component state reset', {
+      retryCount: 0,
+      voiceState: 'idle',
+    });
+  };
+
   // Retry function for when transcription fails
   const retryTranscription = () => {
     debugLog('Debug', 'Retrying transcription', {
       currentAttempt: retryCount,
       nextAttempt: retryCount + 1,
       voiceState: voiceState,
-      hasRecording: !!recording
+      hasRecording: !!recording,
     });
-    
-    setRetryCount(prev => prev + 1);
-    resetVoiceChatState(setVoiceState, setStatusText, setRecording);
-    
-    debugLog('Debug', 'Retry transcription completed', {
-      newRetryCount: retryCount + 1
-    });
+
+    setRetryCount((prev) => prev + 1);
+    reset();
   };
-  
+
   // Manual reset function
   const manualReset = () => {
-    debugLog('Debug', 'Manual reset triggered', {
-      currentRetryCount: retryCount,
-      voiceState: voiceState,
-      hasRecording: !!recording
-    });
-    
-    setRetryCount(0);
-    resetVoiceChatState(setVoiceState, setStatusText, setRecording);
-    
-    debugLog('Debug', 'Manual reset completed', {
-      retryCount: 0,
-      voiceState: 'idle'
-    });
+    debugLog('Debug', 'Manual reset triggered');
+    reset();
   };
   
   // Handle AI streaming completion
@@ -883,15 +888,10 @@ const VoiceChatScreen = () => {
       retryCount: retryCount
     });
     
-    if (voiceState === 'idle') {
-      debugLog('Debug', 'Starting recording from idle state');
+    if (voiceState === 'idle' || voiceState === 'error') {
+      debugLog('Debug', 'Starting recording from idle or error state');
       buttonScale.value = withSpring(0.9);
       startRecording();
-    } else if (voiceState === 'error') {
-      debugLog('Debug', 'Retrying from error state');
-      buttonScale.value = withSpring(0.9);
-      // Handle retry on error state
-      retryTranscription();
     } else if (voiceState === 'playing') {
       debugLog('Debug', 'Interrupting TTS playback');
       await stopPlayback(); // Stop playback before starting a new recording

@@ -75,7 +75,7 @@ export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
                               : "mr-2 mt-1 h-8 w-8 items-center justify-center rounded-full bg-gray-200"
                           }
                         >
-                          <Text className="text-base">
+                          <Text className="text-lg">
                             {m.role === "user" ? "" : "🤖"}
                           </Text>
                         </View>
@@ -100,7 +100,7 @@ export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
                             "mr-2 mt-1 h-8 w-8 items-center justify-center rounded-full bg-gray-200"
                           }
                         >
-                          <Text className="text-base">{"🤖"}</Text>
+                          <Text className="text-lg">{"🤖"}</Text>
                         </View>
                         <View className="-ml-2 -mt-[1px]">
                           <LottieLoader width={40} height={40} />
@@ -110,7 +110,7 @@ export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
                   {streaming.error && (
                     <View className="flex-row px-4 max-w-[95%] pl-0 rounded-3xl">
                       <View className="mr-2 mt-1 h-8 w-8 items-center justify-center rounded-full bg-red-200">
-                        <Text className="text-base">⚠️</Text>
+                        <Text className="text-lg">⚠️</Text>
                       </View>
                       <View className="flex-1 py-2">
                         <Text className="text-red-600">Error: {streaming.error}</Text>

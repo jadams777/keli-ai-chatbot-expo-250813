@@ -35,35 +35,35 @@ const Div = cssInterop(ExpoDiv, { className: "style" });
 
 const rules = {
   heading1: (node, children) => (
-    <H4 key={node.key} className="mb-4 mt-4 font-bold">{children}</H4>
+    <H4 key={node.key} className="mb-4 mt-4 font-bold text-xl text-foreground">{children}</H4>
   ),
   heading2: (node, children) => (
-    <H4 key={node.key} className="mb-4 mt-4 font-bold">{children}</H4>
+    <H4 key={node.key} className="mb-4 mt-4 font-bold text-xl text-foreground">{children}</H4>
   ),
   heading3: (node, children) => (
-    <P key={node.key} className="mb-2 mt-2 font-bold">{children}</P>
+    <P key={node.key} className="mb-2 mt-2 font-bold text-lg text-foreground">{children}</P>
   ),
   heading4: (node, children) => (
-    <P key={node.key} className="mb-2 mt-2 font-bold">{children}</P>
+    <P key={node.key} className="mb-2 mt-2 font-bold text-lg text-foreground">{children}</P>
   ),
   heading5: (node, children) => (
-    <P key={node.key} className="mb-2 mt-2 font-bold">{children}</P>
+    <P key={node.key} className="mb-2 mt-2 font-bold text-lg text-foreground">{children}</P>
   ),
   heading6: (node, children) => (
-    <P key={node.key} className="mb-2 mt-2 font-bold">{children}</P>
+    <P key={node.key} className="mb-2 mt-2 font-bold text-lg text-foreground">{children}</P>
   ),
   code: (node, children, parent) => {
     return parent.length > 1 ? (
-      <Pre key={node.key} className="mt-2 w-[80dvw] overflow-x-scroll rounded-lg bg-zinc-100 p-3 text-sm dark:bg-zinc-800 md:max-w-[500px]">
+      <Pre key={node.key} className="mt-2 w-[80dvw] overflow-x-scroll rounded-lg bg-zinc-100 p-3 text-base dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 md:max-w-[500px]">
         <Code>{children}</Code>
       </Pre>
     ) : (
-      <Code key={node.key} className="rounded-md bg-zinc-100 px-1 py-0.5 text-sm dark:bg-zinc-800">
+      <Code key={node.key} className="rounded-md bg-zinc-100 px-1 py-0.5 text-base dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
         {children}
       </Code>
     );
   },
-  list_item: (node, children) => <Li key={node.key} className="py-1">{children}</Li>,
+  list_item: (node, children) => <Li key={node.key} className="py-1 text-foreground">{children}</Li>,
   ordered_list: (node, children) => (
     <Ol key={node.key} className="ml-4 list-outside list-decimal">{children}</Ol>
   ),
@@ -71,7 +71,7 @@ const rules = {
     <Ul key={node.key} className="ml-4 list-outside list-decimal">{children}</Ul>
   ),
   strong: (node, children) => (
-    <Strong key={node.key} className="font-semibold">{children}</Strong>
+    <Strong key={node.key} className="font-semibold text-foreground">{children}</Strong>
   ),
   link: (node, children) => (
     <A
@@ -85,10 +85,10 @@ const rules = {
     </A>
   ),
   text: (node) => {
-    return <P key={node.key} className="">{node.content}</P>;
+    return <P key={node.key} className="text-lg text-foreground">{node.content}</P>;
   },
   body: (node, children) => {
-    return <Div key={node.key} className="">{children}</Div>;
+    return <Div key={node.key} className="text-lg text-foreground">{children}</Div>;
   },
 };
 

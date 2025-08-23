@@ -29,7 +29,7 @@ const ChatTextInput = React.forwardRef<
       <Comp
         ref={ref as any}
         className={cn(
-          "native:h-12 native:text-md native:leading-[1.25] h-10 rounded-md border border-input bg-background px-3 text-base text-foreground file:border-0 file:bg-transparent file:font-medium placeholder:text-muted-foreground web:flex web:w-full web:py-2 lg:text-sm",
+          "native:h-20 native:text-lg native:leading-[1.25] h-20 rounded-md border border-input bg-background px-3 py-2 text-lg text-foreground file:border-0 file:bg-transparent file:font-medium placeholder:text-muted-foreground web:flex web:w-full lg:text-sm",
           "web:ring-offset-background web:focus-visible:outline-none web:focus-visible:ring-2 web:focus-visible:ring-ring web:focus-visible:ring-offset-2",
           noFocus && "web:focus-visible:ring-0 web:focus-visible:ring-offset-0",
           props.editable === false && "opacity-50 web:cursor-not-allowed",

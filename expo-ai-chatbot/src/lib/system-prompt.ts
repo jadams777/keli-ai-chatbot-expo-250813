@@ -34,7 +34,7 @@ function getCurrentTimeInfo(): string {
 export function getSystemPrompt(): string {
   const timeInfo = getCurrentTimeInfo();
   
-  return `You are a helpful assistant. You provide accurate, helpful, and friendly responses to user questions and requests.
+  return `You are a helpful assistant. You provide accurate, helpful, and friendly responses to user questions and requests. Your name is Keli.
 
 ${timeInfo}
 

@@ -20,10 +20,12 @@ import {
   useAudioRecorderState,
   setAudioModeAsync,
   createAudioPlayer,
+  RecordingPresets,
 } from 'expo-audio';
 import { useAIStreaming } from '@/hooks/useAIStreaming';
 import { useStore } from '@/lib/globalStore';
 import { AppleSpeech } from '@react-native-ai/apple';
+import InCallManager from 'react-native-incall-manager';
 
 // Apple AI module references
 let apple: any = null;
@@ -209,11 +211,13 @@ const VoiceChatScreen = () => {
   
   
 
-  // Import RecordingPresets for proper configuration
-  const { RecordingPresets } = require('expo-audio');
-  
-  // Use standard HIGH_QUALITY preset to avoid crashes
+  // Use HIGH_QUALITY preset for recording - expo-audio will handle format conversion
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  
+  debugLog('Debug', 'Audio recorder initialized with HIGH_QUALITY preset', {
+    preset: 'HIGH_QUALITY',
+    platform: Platform.OS
+  });
   const recorderState = useAudioRecorderState(audioRecorder);
   const { startStreaming, cancelStreaming } = useAIStreaming();
   const { streaming } = useStore();
@@ -254,6 +258,32 @@ const VoiceChatScreen = () => {
     
     requestPermissions();
   }, []);
+
+  // Initialize InCallManager and activate speakerphone on mount
+  useEffect(() => {
+    const initializeCallManager = async () => {
+      try {
+        debugLog('Debug', 'Initializing InCallManager for voice chat');
+        InCallManager.start({ media: 'audio' });
+        InCallManager.setForceSpeakerphoneOn(true);
+        debugLog('Debug', 'InCallManager started with speakerphone activated');
+      } catch (error) {
+        debugLog('Error', 'Failed to initialize InCallManager', { error: error.message });
+      }
+    };
+
+    initializeCallManager();
+
+    // Cleanup on unmount
+    return () => {
+      try {
+        debugLog('Debug', 'Stopping InCallManager on component unmount');
+        InCallManager.stop();
+      } catch (error) {
+        debugLog('Error', 'Failed to stop InCallManager', { error: error.message });
+      }
+    };
+  }, []);
   
   // Configure audio session
   useEffect(() => {
@@ -273,7 +303,26 @@ const VoiceChatScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
+      // Re-initialize InCallManager when screen comes into focus
+      const initializeCallManager = async () => {
+        try {
+          debugLog('Debug', 'Re-initializing InCallManager on screen focus');
+          InCallManager.start({ media: 'audio' });
+          InCallManager.setForceSpeakerphoneOn(true);
+        } catch (error) {
+          debugLog('Error', 'Failed to re-initialize InCallManager on focus', { error: error.message });
+        }
+      };
+
+      initializeCallManager();
+
       return () => {
+        try {
+          debugLog('Debug', 'Stopping InCallManager on screen blur');
+          InCallManager.stop();
+        } catch (error) {
+          debugLog('Error', 'Failed to stop InCallManager on blur', { error: error.message });
+        }
         stopPlayback();
         reset();
       };
@@ -548,6 +597,9 @@ const VoiceChatScreen = () => {
         debugLog('Debug', 'Audio file read successfully', {
           base64Length: base64Audio.length,
           sizeInKB: Math.round(base64Audio.length * 0.75 / 1024), // Approximate size from base64
+          fileUri: uri,
+          fileExtension: uri.split('.').pop(),
+          isWavFormat: uri.toLowerCase().includes('.wav')
         });
         
         if (!base64Audio || base64Audio.length === 0) {
@@ -681,6 +733,16 @@ const VoiceChatScreen = () => {
       voiceState: voiceState,
       hasRecording: !!recording,
     });
+
+    // Stop and restart InCallManager to ensure clean state
+    try {
+      InCallManager.stop();
+      InCallManager.start({ media: 'audio' });
+      InCallManager.setForceSpeakerphoneOn(true);
+      debugLog('Debug', 'InCallManager reset during component reset');
+    } catch (error) {
+      debugLog('Error', 'Failed to reset InCallManager during component reset', { error: error.message });
+    }
 
     setRetryCount(0);
     resetVoiceChatState(setVoiceState, setStatusText, setRecording);

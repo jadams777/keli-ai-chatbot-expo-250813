@@ -60,7 +60,9 @@
       "supportsTablet": true,
       "deploymentTarget": "26.0",
       "infoPlist": {
-        "NSAppleIntelligenceUsageDescription": "This app uses Apple Intelligence to provide AI-powered features with privacy-first, on-device processing."
+        "NSAppleIntelligenceUsageDescription": "This app uses Apple Intelligence to provide enhanced AI-powered responses and contextual assistance.",
+        "NSLocationWhenInUseUsageDescription": "This app uses your location to provide contextual AI responses and location-based queries when you're actively using the app.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses your location to provide contextual AI responses and location-based queries for enhanced user experience."
       }
     },
     "runtimeVersion": {

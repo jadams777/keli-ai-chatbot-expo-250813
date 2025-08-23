@@ -265,8 +265,11 @@ const VoiceChatScreen = () => {
       try {
         debugLog('Debug', 'Initializing InCallManager for voice chat');
         InCallManager.start({ media: 'audio' });
-        InCallManager.setForceSpeakerphoneOn(true);
-        debugLog('Debug', 'InCallManager started with speakerphone activated');
+        // Add delay to allow InCallManager to fully initialize before setting speakerphone
+        setTimeout(() => {
+          InCallManager.setForceSpeakerphoneOn(true);
+          debugLog('Debug', 'InCallManager started with speakerphone activated');
+        }, 150);
       } catch (error) {
         debugLog('Error', 'Failed to initialize InCallManager', { error: error.message });
       }
@@ -308,7 +311,11 @@ const VoiceChatScreen = () => {
         try {
           debugLog('Debug', 'Re-initializing InCallManager on screen focus');
           InCallManager.start({ media: 'audio' });
-          InCallManager.setForceSpeakerphoneOn(true);
+          // Add delay to allow InCallManager to fully initialize before setting speakerphone
+          setTimeout(() => {
+            InCallManager.setForceSpeakerphoneOn(true);
+            debugLog('Debug', 'InCallManager re-initialized with speakerphone activated on focus');
+          }, 150);
         } catch (error) {
           debugLog('Error', 'Failed to re-initialize InCallManager on focus', { error: error.message });
         }
@@ -345,6 +352,15 @@ const VoiceChatScreen = () => {
       }
       
       debugLog('Debug', 'Recording permission granted, starting recording...');
+      
+      // Ensure speakerphone is active before recording
+      try {
+        InCallManager.setForceSpeakerphoneOn(true);
+        debugLog('Debug', 'Speakerphone re-activated for recording');
+      } catch (error) {
+        debugLog('Error', 'Failed to re-activate speakerphone for recording', { error: error.message });
+      }
+      
       setVoiceState('recording');
       setStatusText('Recording... Release to send');
       

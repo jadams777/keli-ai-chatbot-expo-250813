@@ -185,6 +185,7 @@ const VoiceChatScreen = () => {
   voiceStateRef.current = voiceState;
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const audioPlayerRef = useRef<any>(null);
   const [statusText, setStatusText] = useState('Tap and hold to speak');
   const [recording, setRecording] = useState<any>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -717,6 +718,7 @@ const VoiceChatScreen = () => {
             if (result?.audio?.uint8Array) {
               try {
                 const audioPlayer = createAudioPlayer();
+                audioPlayerRef.current = audioPlayer;
 
                 setVoiceState('playing');
                 setStatusText('Playing response...');
@@ -788,6 +790,7 @@ const VoiceChatScreen = () => {
                       await cleanupTempFile();
                       if (audioPlayer.isLoaded) {
                         audioPlayer.remove();
+                        audioPlayerRef.current = null;
                       }
                     }
                   }
@@ -860,6 +863,17 @@ const VoiceChatScreen = () => {
       buttonScale.value = withSpring(0.9);
       // Handle retry on error state
       retryTranscription();
+    } else if (voiceState === 'playing') {
+      debugLog('Debug', 'Interrupting TTS playback');
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.remove();
+        audioPlayerRef.current = null;
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      buttonScale.value = withSpring(0.9);
+      startRecording();
     } else {
       debugLog('Debug', 'Button press ignored', {
         reason: 'invalid state for press in',
@@ -961,7 +975,7 @@ const VoiceChatScreen = () => {
             <Pressable
               onPressIn={onPressIn}
               onPressOut={onPressOut}
-              disabled={voiceState !== 'idle' && voiceState !== 'recording' && voiceState !== 'error'}
+              disabled={voiceState === 'transcribing' || voiceState === 'generating'}
               className={`w-32 h-32 rounded-full ${getButtonColor()} justify-center items-center shadow-lg`}
             >
               <Mic size={48} color={getIconColor()} />

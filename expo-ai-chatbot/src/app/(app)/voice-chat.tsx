@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, Alert, Platform } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, Pressable, Alert, Platform, ScrollView } from 'react-native';
+import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Mic, RotateCcw } from 'lucide-react-native';
+import { ArrowLeft, Mic, RotateCcw, X } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import Animated, {
   useSharedValue,
@@ -189,6 +189,7 @@ const VoiceChatScreen = () => {
   const [statusText, setStatusText] = useState('Tap and hold to speak');
   const [recording, setRecording] = useState<any>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [hasShownResponse, setHasShownResponse] = useState(false);
   
   
 
@@ -205,6 +206,22 @@ const VoiceChatScreen = () => {
   const buttonScale = useSharedValue(1);
   const pulseScale = useSharedValue(1);
   const buttonOpacity = useSharedValue(1);
+
+  const stopPlayback = useCallback(async () => {
+    debugLog('Debug', 'TTS playback stopped by user or on exit');
+    cancelStreaming();
+    if (audioPlayerRef.current) {
+      // Pause playback before removing the player
+      await audioPlayerRef.current.pause();
+      await audioPlayerRef.current.remove();
+      audioPlayerRef.current = null;
+    }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    setVoiceState('idle');
+    setStatusText('Tap and hold to speak');
+  }, [cancelStreaming]);
   
   // Request microphone permissions on mount and cleanup on unmount
   useEffect(() => {
@@ -237,6 +254,14 @@ const VoiceChatScreen = () => {
     
     configureAudio();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        stopPlayback();
+      };
+    }, [stopPlayback])
+  );
   
   const startRecording = async () => {
     performanceTimer.start('startRecording');
@@ -668,6 +693,10 @@ const VoiceChatScreen = () => {
   
   // Handle AI streaming completion
   useEffect(() => {
+    if (streaming.streamingText && !hasShownResponse) {
+      setHasShownResponse(true);
+    }
+
     const handleStreamingComplete = async () => {
       debugLog('Debug', 'Checking streaming completion', {
         isStreaming: streaming.isStreaming,
@@ -845,9 +874,9 @@ const VoiceChatScreen = () => {
         clearInterval(intervalRef.current);
       }
     };
-  }, [streaming.isStreaming, streaming.streamingText]);
+  }, [streaming.isStreaming, streaming.streamingText, hasShownResponse]);
   
-  const onPressIn = () => {
+  const onPressIn = async () => {
     debugLog('Debug', 'Button press in detected', {
       voiceState: voiceState,
       hasRecording: !!recording,
@@ -865,13 +894,7 @@ const VoiceChatScreen = () => {
       retryTranscription();
     } else if (voiceState === 'playing') {
       debugLog('Debug', 'Interrupting TTS playback');
-      if (audioPlayerRef.current) {
-        audioPlayerRef.current.remove();
-        audioPlayerRef.current = null;
-      }
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      await stopPlayback(); // Stop playback before starting a new recording
       buttonScale.value = withSpring(0.9);
       startRecording();
     } else {
@@ -954,43 +977,70 @@ const VoiceChatScreen = () => {
         }}
       />
       
-      <View className="flex-1 justify-center items-center px-8">
-        {/* Status Text */}
-        <Text className="text-white text-lg text-center mb-12 font-medium">
-          {statusText}
-        </Text>
-        
-        {/* Push-to-Talk Button */}
-        <View className="relative">
-          {/* Pulse Effect (only visible when recording) */}
-          {voiceState === 'recording' && (
-            <Animated.View
-              style={[pulseAnimatedStyle]}
-              className="absolute inset-0 w-32 h-32 rounded-full bg-white"
-            />
-          )}
+      <View className="flex-1 items-center px-8">
+        <View className="justify-center items-center my-4">
+          {/* Status Text */}
+          <Text className="text-white text-lg text-center mb-12 font-medium">
+            {statusText}
+          </Text>
           
-          {/* Main Button */}
-          <Animated.View style={buttonAnimatedStyle}>
-            <Pressable
-              onPressIn={onPressIn}
-              onPressOut={onPressOut}
-              disabled={voiceState === 'transcribing' || voiceState === 'generating'}
-              className={`w-32 h-32 rounded-full ${getButtonColor()} justify-center items-center shadow-lg`}
-            >
-              <Mic size={48} color={getIconColor()} />
-            </Pressable>
-          </Animated.View>
-        </View>
-        
-        {/* AI Response Display */}
-        {streaming.streamingText && (
-          <View className="mt-12 px-6">
-            <Text className="text-white text-base text-center leading-6">
-              {streaming.streamingText}
-            </Text>
+          <View className="flex-row items-center justify-center">
+            {/* Push-to-Talk Button */}
+            <View className="relative">
+              {/* Pulse Effect (only visible when recording) */}
+              {voiceState === 'recording' && (
+                <Animated.View
+                  style={[pulseAnimatedStyle]}
+                  className="absolute inset-0 w-32 h-32 rounded-full bg-white"
+                />
+              )}
+              
+              {/* Main Button */}
+              <Animated.View style={buttonAnimatedStyle}>
+                <Pressable
+                  onPressIn={onPressIn}
+                  onPressOut={onPressOut}
+                  disabled={voiceState === 'transcribing' || voiceState === 'generating'}
+                  className={`w-32 h-32 rounded-full ${getButtonColor()} justify-center items-center shadow-lg`}
+                >
+                  <Mic size={48} color={getIconColor()} />
+                </Pressable>
+              </Animated.View>
+            </View>
+
+            {/* Stop Playback Button */}
+            {voiceState === 'playing' && (
+              <Pressable
+                onPress={stopPlayback}
+                className="ml-8 bg-red-500 w-16 h-16 rounded-full justify-center items-center"
+              >
+                <X size={32} color="white" />
+              </Pressable>
+            )}
           </View>
-        )}
+        </View>
+
+        {/* AI Response Display */}
+        <View className="flex-1 w-full">
+          <ScrollView 
+            className="flex-1"
+            contentContainerStyle={{
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexGrow: 1,
+            }}
+          >
+            {streaming.streamingText ? (
+              <View className="px-6">
+                <Text className="text-white text-base text-center leading-6">
+                  {streaming.streamingText}
+                </Text>
+              </View>
+            ) : (
+              <View />
+            )}
+          </ScrollView>
+        </View>
         
         {/* Manual Reset Button - only show in error state */}
         {voiceState === 'error' && (
@@ -1005,14 +1055,16 @@ const VoiceChatScreen = () => {
         )}
         
         {/* Instructions */}
-        <View className="absolute bottom-20 left-0 right-0 px-8">
-          <Text className="text-gray-400 text-sm text-center leading-5">
-            {voiceState === 'error' 
-              ? `Retry attempt ${retryCount + 1}. Tap the microphone to retry or the reset button to start over.`
-              : 'Hold the button to record your voice message. Release to send and hear the AI response.'
-            }
-          </Text>
-        </View>
+        {!hasShownResponse && (
+          <View className="absolute bottom-20 left-0 right-0 px-8">
+            <Text className="text-gray-400 text-sm text-center leading-5">
+              {voiceState === 'error' 
+                ? `Retry attempt ${retryCount + 1}. Tap the microphone to retry or the reset button to start over.`
+                : 'Hold the button to record your voice message. Release to send and hear the AI response.'
+              }
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );

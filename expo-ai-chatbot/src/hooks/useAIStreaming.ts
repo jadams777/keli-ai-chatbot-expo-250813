@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { streamText } from 'ai';
 import { getAvailableProvider, getModelConfig } from '../lib/ai-providers';
+import { getSystemPrompt } from '../lib/system-prompt';
 import { useStore } from '../lib/globalStore';
 
 export interface StreamingState {
@@ -66,9 +67,10 @@ export function useAIStreaming() {
       // Create abort controller for cancellation
       abortControllerRef.current = new AbortController();
 
-      // Start text streaming
+      // Start text streaming with system prompt
       const streamConfig = {
         model: provider,
+        system: getSystemPrompt(),
         prompt: options.prompt,
         maxOutputTokens: options.maxOutputTokens || modelConfig.maxOutputTokens,
         temperature: options.temperature || modelConfig.temperature,

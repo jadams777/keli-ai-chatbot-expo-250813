@@ -4,7 +4,8 @@ import { getWeatherData } from './weather-service';
 
 // Schema for the getWeather tool - simplified for Apple Intelligence compatibility
 const getWeatherSchema = z.object({
-  city: z.string()
+  city: z.string(),
+  forecast_days: z.number().default(3).optional(),
 });
 
 // Debug logging for schema creation
@@ -17,11 +18,12 @@ console.log('[TOOLS DEBUG] Creating getWeatherSchema:', {
 
 // Define the getWeather tool
 export const getWeatherTool = tool({
-  description: 'Get current weather information for a specific city. Use this when users ask about weather conditions, temperature, or climate in any location.',
+  description: 'Get current weather information or a weather forecast for a specific city. Use this when users ask about weather conditions, temperature, or climate in any location. You can also specify the number of days for a forecast.',
   inputSchema: z.object({
     city: z.string(),
+    forecast_days: z.number().default(3).optional(),
   }),
-  execute: async ({ city }: { city: string }) => {
+  execute: async ({ city, forecast_days }: { city: string, forecast_days?: number }) => {
     console.log('[TOOLS DEBUG] getWeatherTool execute called with city:', city);
     console.log('[TOOLS DEBUG] Execute function input validation:', {
       cityType: typeof city,
@@ -40,7 +42,7 @@ export const getWeatherTool = tool({
       }
       
       console.log('[TOOLS DEBUG] Calling getWeatherData with validated city:', city.trim());
-      const result = await getWeatherData(city.trim());
+      const result = await getWeatherData(city.trim(), forecast_days);
       console.log('[TOOLS DEBUG] getWeatherTool execute success:', {
         hasResult: !!result,
         resultType: typeof result,

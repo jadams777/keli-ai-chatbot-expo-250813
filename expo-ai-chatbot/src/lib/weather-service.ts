@@ -8,6 +8,12 @@ interface WeatherData {
     relative_humidity_2m: number;
     wind_speed_10m: number;
   };
+  daily?: {
+    time: string[];
+    weathercode: number[];
+    temperature_2m_max: number[];
+    temperature_2m_min: number[];
+  };
 }
 
 interface OpenCageGeocodingResult {
@@ -56,27 +62,33 @@ async function getCoordinates(city: string): Promise<{ lat: number; lon: number;
 /**
  * Fetch weather data from Open-Meteo API
  */
-export async function getWeatherData(city: string): Promise<WeatherData> {
+export async function getWeatherData(city: string, forecast_days?: number): Promise<WeatherData> {
   try {
     // First, get coordinates for the city
     const { lat, lon, name } = await getCoordinates(city);
     
-    const params = {
+    const params: any = {
       "latitude": lat,
       "longitude": lon,
       "current": ["temperature_2m", "relative_humidity_2m", "weather_code", "wind_speed_10m"],
       "temperature_unit": "fahrenheit",
       "wind_speed_unit": "mph",
       "timezone": "auto",
-      "forecast_days": 1,
     };
+
+    if (forecast_days) {
+      params["daily"] = ["weather_code", "temperature_2m_max", "temperature_2m_min"];
+      params["forecast_days"] = forecast_days;
+    }
+
     const url = "https://api.open-meteo.com/v1/forecast";
     const responses = await fetchWeatherApi(url, params);
     
     const response = responses[0];
     const current = response.current()!;
-    
-    return {
+    const daily = response.daily()!;
+
+    const weatherData: WeatherData = {
       city: name,
       current: {
         temperature_2m: Math.round(current.variables(0)!.value()),
@@ -85,6 +97,17 @@ export async function getWeatherData(city: string): Promise<WeatherData> {
         wind_speed_10m: Math.round(current.variables(3)!.value() * 10) / 10,
       }
     };
+
+    if (daily) {
+      weatherData.daily = {
+        time: daily.variables(0)!.valuesArray()! as unknown as string[],
+        weathercode: daily.variables(1)!.valuesArray()! as unknown as number[],
+        temperature_2m_max: daily.variables(2)!.valuesArray()! as unknown as number[],
+        temperature_2m_min: daily.variables(3)!.valuesArray()! as unknown as number[],
+      };
+    }
+    
+    return weatherData;
   } catch (error) {
     console.error('Weather service error:', error);
     if (error instanceof Error && error.message.includes('City')) {

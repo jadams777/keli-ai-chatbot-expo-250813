@@ -9,7 +9,7 @@ import { WelcomeMessage } from "@/components/welcome-message";
 import React, { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 import { LottieLoader } from "@/components/lottie-loader";
-import { useStore } from "@/lib/globalStore";
+import { useStore, type ToolCall } from "@/lib/globalStore";
 
 import { type UIMessage } from "@/lib/utils";
 
@@ -32,9 +32,10 @@ export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
           {messages.length > 0
             ? messages.map((m, index) => (
                 <React.Fragment key={m.id}>
+                  {/* Handle tool invocations from messages (existing behavior) */}
                   {m.toolInvocations?.map((t) => {
                     if (t.toolName === "getWeather") {
-                      if (t.state !== "result") {
+                      if (!t.result) {
                         return (
                           <View
                             key={t.toolCallId}
@@ -47,7 +48,7 @@ export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
                           </View>
                         );
                       }
-                      if (t.state === "result") {
+                      if (t.result) {
                         return (
                           <WeatherCard
                             key={t.toolCallId}
@@ -56,6 +57,38 @@ export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
                             weatherCode={t.result.current.weathercode}
                             humidity={t.result.current.relative_humidity_2m}
                             wind={t.result.current.wind_speed_10m}
+                          />
+                        );
+                      }
+                    }
+                    return null;
+                  })}
+
+                  {/* Handle tool calls from streaming state (new Apple Intelligence behavior) */}
+                  {streaming.isStreaming && streaming.currentMessageId === m.id && streaming.toolCalls?.map((toolCall: ToolCall) => {
+                    if (toolCall.toolName === "getWeather") {
+                      if (!toolCall.result) {
+                        return (
+                          <View
+                            key={toolCall.toolCallId}
+                            className={cn(
+                              "mt-4 max-w-[85%] rounded-2xl bg-muted/50 p-4",
+                            )}
+                          >
+                            <ActivityIndicator size="small" color="black" />
+                            <Text>Getting weather data...</Text>
+                          </View>
+                        );
+                      }
+                      if (toolCall.result) {
+                        return (
+                          <WeatherCard
+                            key={toolCall.toolCallId}
+                            city={toolCall.result.city || "Unknown"}
+                            temperature={toolCall.result.current.temperature_2m}
+                            weatherCode={toolCall.result.current.weathercode}
+                            humidity={toolCall.result.current.relative_humidity_2m}
+                            wind={toolCall.result.current.wind_speed_10m}
                           />
                         );
                       }

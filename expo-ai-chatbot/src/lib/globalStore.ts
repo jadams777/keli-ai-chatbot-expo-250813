@@ -5,11 +5,19 @@ type ChatIdState = {
   from: "history" | "newChat";
 } | null;
 
+export interface ToolCall {
+  toolCallId: string;
+  toolName: string;
+  args: any;
+  result?: any;
+}
+
 type StreamingState = {
   isStreaming: boolean;
   currentMessageId: string | null;
   streamingText: string;
   error: string | null;
+  toolCalls: ToolCall[];
 };
 
 type AIProviderState = {
@@ -69,6 +77,7 @@ export const useStore = create<StoreState>((set) => ({
     currentMessageId: null,
     streamingText: '',
     error: null,
+    toolCalls: [],
   },
   setStreamingState: (state: Partial<StreamingState>) =>
     set((prevState) => ({
@@ -81,6 +90,7 @@ export const useStore = create<StoreState>((set) => ({
         currentMessageId: null,
         streamingText: '',
         error: null,
+        toolCalls: [],
       },
     }),
   // AI Provider state

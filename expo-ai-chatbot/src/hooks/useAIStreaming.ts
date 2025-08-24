@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef } from 'react';
-import { streamText } from 'ai';
+import { streamText, generateText } from 'ai';
 import { getAvailableProvider, getModelConfig } from '../lib/ai-providers';
 import { getSystemPrompt } from '../lib/system-prompt';
-import { useStore } from '../lib/globalStore';
+import { useStore, type ToolCall } from '../lib/globalStore';
+import { getWeatherTool } from '../lib/tools';
 
 export interface StreamingState {
   isStreaming: boolean;
@@ -11,6 +12,7 @@ export interface StreamingState {
   error: string | null;
   isLocal: boolean;
   modelName: string;
+  toolCalls: ToolCall[];
 }
 
 export interface StreamingOptions {
@@ -29,6 +31,7 @@ export function useAIStreaming() {
     error: null,
     isLocal: false,
     modelName: '',
+    toolCalls: [],
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -43,6 +46,7 @@ export function useAIStreaming() {
         error: null,
         isLocal: false,
         modelName: '',
+        toolCalls: [],
       });
       
       // Also reset global streaming state
@@ -67,7 +71,115 @@ export function useAIStreaming() {
       // Create abort controller for cancellation
       abortControllerRef.current = new AbortController();
 
-      // Start text streaming with system prompt
+      // Check if this is Apple Intelligence (which handles tools differently)
+      if (isLocal && modelName === 'apple-intelligence') {
+        console.log('[USEAISTREAMING DEBUG] Using Apple Intelligence provider');
+        console.log('[USEAISTREAMING DEBUG] Provider details:', {
+          provider: !!provider,
+          providerType: typeof provider,
+          isLocal,
+          modelName
+        });
+        
+        // Use generateText for Apple Intelligence (tools are pre-registered in provider)
+        const generateConfig = {
+          model: provider,
+          system: getSystemPrompt(),
+          prompt: options.prompt,
+          tools: {
+            getWeather: getWeatherTool
+          },
+          maxOutputTokens: options.maxOutputTokens || modelConfig.maxOutputTokens,
+          temperature: options.temperature || modelConfig.temperature,
+          topP: options.topP || modelConfig.topP,
+          abortSignal: abortControllerRef.current.signal,
+        };
+        
+        console.log('[USEAISTREAMING DEBUG] generateText config:', {
+          hasModel: !!generateConfig.model,
+          modelType: typeof generateConfig.model,
+          systemPrompt: generateConfig.system?.substring(0, 100) + '...',
+          prompt: generateConfig.prompt?.substring(0, 100) + '...',
+          tools: {
+            getWeather: !!generateConfig.tools.getWeather,
+            toolStructure: generateConfig.tools.getWeather ? {
+              description: generateConfig.tools.getWeather.description,
+              parameters: generateConfig.tools.getWeather.inputSchema,
+              execute: !!generateConfig.tools.getWeather.execute
+            } : 'N/A'
+          },
+          maxOutputTokens: generateConfig.maxOutputTokens,
+          temperature: generateConfig.temperature,
+          topP: generateConfig.topP
+        });
+        
+        console.log('[USEAISTREAMING DEBUG] Calling generateText with Apple Intelligence...');
+        try {
+          const result = await generateText(generateConfig);
+          console.log('[USEAISTREAMING DEBUG] generateText result:', {
+            hasResult: !!result,
+            resultType: typeof result,
+            hasText: !!result?.text,
+            textLength: result?.text?.length || 0,
+            hasToolCalls: !!result?.toolCalls,
+            toolCallsCount: result?.toolCalls?.length || 0,
+            resultKeys: result ? Object.keys(result) : 'N/A'
+          });
+          
+          // Handle tool calls if any
+           if (result.toolCalls && result.toolCalls.length > 0) {
+             console.log('[USEAISTREAMING DEBUG] Processing tool calls...');
+           const toolCalls: ToolCall[] = result.toolCalls.map((toolCall: any) => ({
+             toolCallId: toolCall.toolCallId,
+             toolName: toolCall.toolName,
+             args: toolCall.args,
+           }));
+           
+           const cleanedText = String(result.text || '').replace(/^null/, '').replace(/The weather code is \d+\./, '').trim();
+
+           setState(prev => ({
+             ...prev,
+             text: cleanedText,
+             content: cleanedText,
+             toolCalls,
+             isStreaming: false,
+           }));
+           
+           // Update global streaming state with tool calls
+           setStreamingState({
+             isStreaming: false,
+             streamingText: cleanedText,
+             toolCalls,
+           });
+         } else {
+           console.log('[USEAISTREAMING DEBUG] No tool calls, processing text response');
+           const cleanedText = String(result.text || '').replace(/^null/, '').replace(/The weather code is \d+\./, '').trim();
+
+           setState(prev => ({
+             ...prev,
+             text: cleanedText,
+             content: cleanedText,
+             isStreaming: false,
+           }));
+           
+           // Update global streaming state
+           setStreamingState({
+             isStreaming: false,
+             streamingText: cleanedText,
+           });
+         }
+        
+        return;
+        
+        } catch (generateError) {
+          console.log('[USEAISTREAMING DEBUG] generateText failed:', generateError.message);
+          console.log('[USEAISTREAMING DEBUG] generateText error details:', generateError);
+          console.log('[USEAISTREAMING DEBUG] generateText error stack:', generateError.stack);
+          throw generateError; // Re-throw to be handled by outer catch
+        }
+      }
+
+      // For non-Apple providers, use streamText (existing behavior)
       const streamConfig = {
         model: provider,
         system: getSystemPrompt(),
@@ -137,7 +249,13 @@ export function useAIStreaming() {
       });
 
     } catch (error) {
+      console.log('[USEAISTREAMING DEBUG] Main error handler triggered');
+      console.log('[USEAISTREAMING DEBUG] Error type:', error instanceof Error ? error.constructor.name : typeof error);
+      console.log('[USEAISTREAMING DEBUG] Error message:', error instanceof Error ? error.message : String(error));
+      console.log('[USEAISTREAMING DEBUG] Error details:', error);
+      
       if (error instanceof Error && error.name === 'AbortError') {
+        console.log('[USEAISTREAMING DEBUG] Stream was cancelled (AbortError)');
         // Stream was cancelled
         setState(prev => ({
           ...prev,
@@ -149,6 +267,7 @@ export function useAIStreaming() {
           isStreaming: false,
         });
       } else {
+        console.log('[USEAISTREAMING DEBUG] Actual error occurred, updating state with error');
         // Actual error occurred
         setState(prev => ({
           ...prev,
@@ -181,6 +300,7 @@ export function useAIStreaming() {
       error: null,
       isLocal: false,
       modelName: '',
+      toolCalls: [],
     });
     
     // Also reset global streaming state

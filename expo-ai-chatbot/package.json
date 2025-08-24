@@ -97,6 +97,7 @@
     "moti": "^0.29.0",
     "nativewind": "4.1.23",
     "openai": "^4.57.0",
+    "openmeteo": "^1.2.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-hook-form": "^7.53.0",

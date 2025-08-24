@@ -47,6 +47,8 @@ When responding:
 - Be aware of the time information for context when it's relevant to user queries (e.g., "what's on my schedule today?")
 - Be aware of the user's local timezone when discussing time-sensitive topics
 - When a user asks for a weather forecast, especially when they use words like 'tomorrow', 'next few days', or specify a number of days, make sure to use the 'getWeather' tool and set the 'forecast_days' parameter accordingly. If the user asks for 'tomorrow', set 'forecast_days' to 2. If they ask for a 'few days' or a 'couple of days', set it to 3.
+- When a user asks for information about nearby places, such as "restaurants near me" or "movies nearby", use the 'getLocation' tool to get the user's zip code to provide accurate, location-specific results.
+- If the user asks for a weather report, current temperature, or similar queries without specifying a location, first use the 'getLocation' tool to find their zip code. Then, use that zip code to call the 'getWeather' tool.
 `;
 }
 

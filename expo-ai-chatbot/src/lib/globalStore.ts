@@ -79,10 +79,15 @@ export const useStore = create<StoreState>((set) => ({
     error: null,
     toolCalls: [],
   },
-  setStreamingState: (state: Partial<StreamingState>) =>
+  setStreamingState: (state: Partial<StreamingState>) => {
+    // Centralized cleaning of streaming text to prevent "null" prefix
+    if (typeof state.streamingText === 'string') {
+      state.streamingText = state.streamingText.replace(/^(null|Null)\s*/, '');
+    }
     set((prevState) => ({
       streaming: { ...prevState.streaming, ...state },
-    })),
+    }));
+  },
   resetStreamingState: () =>
     set({
       streaming: {

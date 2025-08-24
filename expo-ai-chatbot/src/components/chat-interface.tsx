@@ -125,7 +125,7 @@ export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
                     )}
                   </View>
                   {(isLoading || streaming.isStreaming) &&
-                    messages[messages.length - 1].role === "user" &&
+                    messages[messages.length - 1].role === "assistant" &&
                     m === messages[messages.length - 1] && (
                       <View className="flex-row">
                         <View

@@ -1042,6 +1042,7 @@ const VoiceChatScreen = () => {
     
     if (voiceState === 'idle' || voiceState === 'error') {
       debugLog('Debug', 'Starting recording from idle or error state');
+      InCallManager.setForceSpeakerphoneOn(true);
       buttonScale.value = withSpring(0.9);
       startRecording();
     } else if (voiceState === 'playing') {

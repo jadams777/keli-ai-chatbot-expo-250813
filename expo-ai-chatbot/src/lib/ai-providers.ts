@@ -1,5 +1,5 @@
 import { createOpenAI } from '@ai-sdk/openai';
-import { getWeatherTool } from './tools';
+import { getWeatherTool, serperTool } from './tools';
 
 // Safely import Apple Intelligence with error handling
 let appleProvider: any = null;
@@ -84,7 +84,8 @@ export async function getAvailableProvider(): Promise<ProviderInfo> {
       // Create Apple provider with pre-registered tools
       const apple = createAppleProvider({
         availableTools: {
-          getWeather: getWeatherTool
+          getWeather: getWeatherTool,
+          search: serperTool
         }
       });
       console.log('[AI-PROVIDERS DEBUG] Apple provider created successfully:', {
@@ -180,7 +181,8 @@ export async function getProviderByModel(modelName: string): Promise<ProviderInf
       // Create Apple provider with pre-registered tools
       const apple = createAppleProvider({
         availableTools: {
-          getWeather: getWeatherTool
+          getWeather: getWeatherTool,
+          search: serperTool
         }
       });
       console.log('[AI-PROVIDERS DEBUG] Apple provider function created for model');

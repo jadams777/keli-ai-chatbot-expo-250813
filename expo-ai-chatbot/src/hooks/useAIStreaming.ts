@@ -3,7 +3,7 @@ import { streamText, generateText } from 'ai';
 import { getAvailableProvider, getModelConfig } from '../lib/ai-providers';
 import { getSystemPrompt } from '../lib/system-prompt';
 import { useStore, type ToolCall } from '../lib/globalStore';
-import { getWeatherTool } from '../lib/tools';
+import { getWeatherTool, serperTool } from '../lib/tools';
 
 export interface StreamingState {
   isStreaming: boolean;
@@ -87,7 +87,8 @@ export function useAIStreaming() {
           system: getSystemPrompt(),
           prompt: options.prompt,
           tools: {
-            getWeather: getWeatherTool
+            getWeather: getWeatherTool,
+            search: serperTool
           },
           maxOutputTokens: options.maxOutputTokens || modelConfig.maxOutputTokens,
           temperature: options.temperature || modelConfig.temperature,
@@ -102,10 +103,16 @@ export function useAIStreaming() {
           prompt: generateConfig.prompt?.substring(0, 100) + '...',
           tools: {
             getWeather: !!generateConfig.tools.getWeather,
-            toolStructure: generateConfig.tools.getWeather ? {
+            search: !!generateConfig.tools.search,
+            getWeatherToolStructure: generateConfig.tools.getWeather ? {
               description: generateConfig.tools.getWeather.description,
               parameters: generateConfig.tools.getWeather.inputSchema,
               execute: !!generateConfig.tools.getWeather.execute
+            } : 'N/A',
+            searchToolStructure: generateConfig.tools.search ? {
+              description: generateConfig.tools.search.description,
+              parameters: generateConfig.tools.search.inputSchema,
+              execute: !!generateConfig.tools.search.execute
             } : 'N/A'
           },
           maxOutputTokens: generateConfig.maxOutputTokens,

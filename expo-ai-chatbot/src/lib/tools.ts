@@ -76,9 +76,52 @@ console.log('[TOOLS DEBUG] Created getWeatherTool:', {
   hasExecute: typeof getWeatherTool.execute === 'function'
 });
 
+// Define the serperTool
+export const serperTool = tool({
+  description: 'Use the Serper API to perform a web search. This is useful for finding information on the internet. Use this when users ask for information that is not related to weather.',
+  inputSchema: z.object({
+    query: z.string(),
+  }),
+  execute: async ({ query }: { query: string }) => {
+    const myHeaders = new Headers();
+    myHeaders.append("X-API-KEY", process.env.EXPO_PUBLIC_SERPER_API_KEY);
+    myHeaders.append("Content-Type", "application/json");
+
+    const raw = JSON.stringify({
+      "q": query
+    });
+
+    const requestOptions: RequestInit = {
+      method: "POST",
+      headers: myHeaders,
+      body: raw,
+      redirect: "follow"
+    };
+
+    try {
+      const response = await fetch("https://google.serper.dev/search", requestOptions);
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error(error);
+      return { error: error.message };
+    };
+  }
+});
+
+// Debug logging for tool creation
+console.log('[TOOLS DEBUG] Created serperTool:', {
+  tool: serperTool,
+  toolType: typeof serperTool,
+  description: serperTool.description,
+  parameters: serperTool.inputSchema,
+  hasExecute: typeof serperTool.execute === 'function'
+});
+
 // Export all available tools
 export const tools = {
-  getWeather: getWeatherTool
+  getWeather: getWeatherTool,
+  search: serperTool,
 };
 
 // Export tool names for easy reference

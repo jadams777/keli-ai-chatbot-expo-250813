@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
-import { streamText, generateText } from 'ai';
+import { streamText, generateText, type CoreMessage } from 'ai';
 import { getAvailableProvider, getModelConfig } from '../lib/ai-providers';
-import { getSystemPrompt } from '../lib/system-prompt';
 import { useStore, type ToolCall } from '../lib/globalStore';
 import { getWeatherTool, serperTool, getLocationTool } from '../lib/tools';
 
@@ -23,7 +22,7 @@ export interface StreamingState {
 }
 
 export interface StreamingOptions {
-  prompt: string;
+  messages: CoreMessage[];
   maxOutputTokens?: number;
   temperature?: number;
   topP?: number;
@@ -58,8 +57,7 @@ export function useAIStreaming() {
       if (isLocal && modelName === 'apple-intelligence') {
         const generateConfig = {
           model: provider,
-          system: getSystemPrompt(),
-          prompt: options.prompt,
+          messages: options.messages,
           tools: { getWeather: getWeatherTool, search: serperTool, getLocation: getLocationTool },
           maxOutputTokens: options.maxOutputTokens || modelConfig.maxOutputTokens,
           temperature: options.temperature || modelConfig.temperature,
@@ -88,8 +86,7 @@ export function useAIStreaming() {
 
       const streamConfig = {
         model: provider,
-        system: getSystemPrompt(),
-        prompt: options.prompt,
+        messages: options.messages,
         maxOutputTokens: options.maxOutputTokens || modelConfig.maxOutputTokens,
         temperature: options.temperature || modelConfig.temperature,
         topP: options.topP || modelConfig.topP,

@@ -82,6 +82,28 @@ const logMemoryUsage = (context: string) => {
   }
 };
 
+// Function to remove markdown and emojis for speech
+const cleanSpokenText = (text: string) => {
+  if (!text) return '';
+
+  // Remove markdown-like characters (e.g., *, **, __, #, ##, ###, etc.)
+  let cleanedText = text.replace(/(\*|_|`|~|#|\d+\.|-|>)/g, '');
+
+  // Remove emojis
+  cleanedText = cleanedText.replace(/(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/g, '');
+
+  // Remove URLs
+  cleanedText = cleanedText.replace(/https?:\[^\s]+/g, '');
+
+  // Remove markdown links but keep the text
+  cleanedText = cleanedText.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+
+  // Replace multiple spaces with a single space
+  cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+
+  return cleanedText;
+};
+
 // Enhanced function to load Apple AI modules with detailed logging
 const loadAppleAIModules = async () => {
   performanceTimer.start('loadAppleAIModules');
@@ -719,7 +741,7 @@ const VoiceChatScreen = () => {
       setStatusText('Thinking...');
       
       await startStreaming({
-        prompt: transcription.trim()
+        messages: [{ role: 'user', content: transcription.trim() }],
       });
       
       performanceTimer.end('stopRecording');
@@ -832,6 +854,7 @@ const VoiceChatScreen = () => {
             
             // Generate speech using AppleSpeech with selected voice from settings
             let result;
+            const spokenText = cleanSpokenText(streaming.streamingText);
             try {
               // Load selected voice from AsyncStorage
               const selectedVoice = await loadSelectedVoice();
@@ -844,7 +867,7 @@ const VoiceChatScreen = () => {
                   name: selectedVoice.name
                 });
                 
-                result = await AppleSpeech.generate(streaming.streamingText, {
+                result = await AppleSpeech.generate(spokenText, {
                   voice: selectedVoice.identifier,
                   language: selectedVoice.language
                 });
@@ -876,20 +899,20 @@ const VoiceChatScreen = () => {
                     name: fallbackVoice.name
                   });
                   
-                  result = await AppleSpeech.generate(streaming.streamingText, {
+                  result = await AppleSpeech.generate(spokenText, {
                     voice: fallbackVoice.identifier,
                     language: fallbackVoice.language
                   });
                 } else {
                   debugLog('Debug', 'No premium/enhanced voices found, using default');
-                  result = await AppleSpeech.generate(streaming.streamingText);
+                  result = await AppleSpeech.generate(spokenText);
                 }
               }
             } catch (voiceError) {
               debugLog('Warning', 'Failed to configure voice, using default', {
                 error: voiceError?.message
               });
-              result = await AppleSpeech.generate(streaming.streamingText);
+              result = await AppleSpeech.generate(spokenText);
             }
             performanceTimer.end('appleSpeechGenerate');
             

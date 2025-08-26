@@ -27,7 +27,7 @@
     "eas:build:staging:ios": "cross-env NODE_ENV=staging APP_ENV=staging eas build --profile staging --platform ios"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^2.0.19",
+    "@ai-sdk/openai-compatible": "^1.0.11",
     "@ai-sdk/react": "^2.0.22",
     "@ai-sdk/ui-utils": "^1.2.11",
     "@babel/plugin-proposal-export-namespace-from": "^7.18.9",

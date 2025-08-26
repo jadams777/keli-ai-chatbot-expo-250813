@@ -25,6 +25,7 @@ import {
 import { useAIStreaming } from '@/hooks/useAIStreaming';
 import { useStore } from '@/lib/globalStore';
 import { AppleSpeech } from '@react-native-ai/apple';
+import { getSystemPrompt } from '@/lib/system-prompt';
 import InCallManager from 'react-native-incall-manager';
 
 // Apple AI module references
@@ -741,7 +742,10 @@ const VoiceChatScreen = () => {
       setStatusText('Thinking...');
       
       await startStreaming({
-        messages: [{ role: 'user', content: transcription.trim() }],
+        messages: [
+          { role: 'system', content: getSystemPrompt() },
+          { role: 'user', content: transcription.trim() }
+        ],
       });
       
       performanceTimer.end('stopRecording');

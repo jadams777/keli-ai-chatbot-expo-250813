@@ -6,9 +6,9 @@ export default function Layout() {
     <Providers>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen
-          name="(app)/index"
+          name="(app)"
           options={{
-            headerTitle: "Expo AI Chatbot",
+            headerShown: false,
           }}
         />
       </Stack>

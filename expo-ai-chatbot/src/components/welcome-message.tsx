@@ -1,7 +1,7 @@
 import { View, Pressable, Linking } from "react-native";
 import { Image } from "expo-image";
 import { Text } from "@/components/ui/text";
-import { MessageCircle } from "@/lib/icons";
+import { MessageCircle } from "lucide-react-native";
 
 export const WelcomeMessage = () => {
   return (
@@ -15,7 +15,7 @@ export const WelcomeMessage = () => {
         <Text className="mr-1">+</Text>
         <Text className="mt-3 text-5xl">▲</Text>
         <Text className="mr-1">+</Text>
-        <MessageCircle size={32} color="black" />
+        <MessageCircle size={32} color="#000" />
       </View>
 
       <View className="space-y-4">

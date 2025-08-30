@@ -47,6 +47,13 @@
           "image": "./src/assets/splash.png",
           "imageWidth": 200
         }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "This app needs access to your calendar to help you manage events and schedules.",
+          "remindersPermission": "This app needs access to your reminders to help you manage tasks and notifications."
+        }
       ]
     ],
     "experiments": {

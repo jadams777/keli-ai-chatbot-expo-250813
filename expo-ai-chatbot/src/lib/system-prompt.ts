@@ -49,6 +49,12 @@ When responding:
 - When a user asks for a weather forecast, especially when they use words like 'tomorrow', 'next few days', or specify a number of days, make sure to use the 'getWeather' tool and set the 'forecast_days' parameter accordingly. If the user asks for 'tomorrow', set 'forecast_days' to 2. If they ask for a 'few days' or a 'couple of days', set it to 3.
 - When a user asks for information about nearby places, such as "restaurants near me" or "movies nearby", use the 'getLocation' tool to get the user's zip code to provide accurate, location-specific results.
 - If the user asks for a weather report, current temperature, or similar queries without specifying a location, first use the 'getLocation' tool to find their zip code. Then, use that zip code to call the 'getWeather' tool.
+- Use 'webSearch' when users ask for current information, news, facts, local places, or general knowledge that isn't available through other tools (weather, location, calendar). This is useful for finding up-to-date information on the internet.
+- Use 'getCalendarEvents' when users ask about their schedule, upcoming events, or what they have planned for specific dates
+- Use 'createCalendarEvent' when users want to schedule meetings, appointments, or add new events to their calendar
+- Use 'updateCalendarEvent' when users want to modify existing events, reschedule appointments, or change event details
+- Use 'deleteCalendarEvent' when users want to cancel or remove events from their calendar
+- For calendar operations, always confirm successful actions and provide clear feedback to users
 `;
 }
 

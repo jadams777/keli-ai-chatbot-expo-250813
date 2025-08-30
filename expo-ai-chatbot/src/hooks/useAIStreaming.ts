@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { streamText, generateText, type CoreMessage } from 'ai';
 import { getAvailableProvider, getModelConfig } from '../lib/ai-providers';
 import { useStore, type ToolCall } from '../lib/globalStore';
-import { getWeatherTool, serperTool, getLocationTool } from '../lib/tools';
+import { getWeatherTool, webSearchTool, getLocationTool, getCalendarEventsTool, createCalendarEventTool, updateCalendarEventTool, deleteCalendarEventTool } from '../lib/tools';
 
 // Helper to robustly clean the AI's text response
 const cleanText = (text: string | null | undefined): string => {
@@ -58,7 +58,15 @@ export function useAIStreaming() {
         const generateConfig = {
           model: provider,
           messages: options.messages,
-          tools: { getWeather: getWeatherTool, search: serperTool, getLocation: getLocationTool },
+          tools: { 
+            getWeather: getWeatherTool, 
+            search: webSearchTool, 
+            getLocation: getLocationTool,
+            getCalendarEvents: getCalendarEventsTool,
+            createCalendarEvent: createCalendarEventTool,
+            updateCalendarEvent: updateCalendarEventTool,
+            deleteCalendarEvent: deleteCalendarEventTool
+          },
           maxOutputTokens: options.maxOutputTokens || modelConfig.maxOutputTokens,
           temperature: options.temperature || modelConfig.temperature,
           topP: options.topP || modelConfig.topP,

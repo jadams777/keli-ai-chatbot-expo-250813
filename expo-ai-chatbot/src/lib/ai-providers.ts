@@ -1,4 +1,4 @@
-import { getWeatherTool, serperTool, getLocationTool } from './tools';
+import { getWeatherTool, webSearchTool, getLocationTool, getCalendarEventsTool, createCalendarEventTool, updateCalendarEventTool, deleteCalendarEventTool } from './tools';
 
 let appleProvider: any = null;
 let createAppleProvider: any = null;
@@ -36,8 +36,12 @@ export async function getAvailableProvider(): Promise<ProviderInfo> {
       const apple = createAppleProvider({
         availableTools: {
           getWeather: getWeatherTool,
-          search: serperTool,
+          search: webSearchTool,
           getLocation: getLocationTool,
+          getCalendarEvents: getCalendarEventsTool,
+          createCalendarEvent: createCalendarEventTool,
+          updateCalendarEvent: updateCalendarEventTool,
+          deleteCalendarEvent: deleteCalendarEventTool,
         }
       });
       const provider = apple();
@@ -67,8 +71,12 @@ export async function getProviderByModel(modelName: string): Promise<ProviderInf
       const apple = createAppleProvider({
         availableTools: {
           getWeather: getWeatherTool,
-          search: serperTool,
+          search: webSearchTool,
           getLocation: getLocationTool,
+          getCalendarEvents: getCalendarEventsTool,
+          createCalendarEvent: createCalendarEventTool,
+          updateCalendarEvent: updateCalendarEventTool,
+          deleteCalendarEvent: deleteCalendarEventTool,
         }
       });
       const provider = apple();

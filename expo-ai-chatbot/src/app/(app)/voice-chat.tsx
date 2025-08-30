@@ -1150,12 +1150,26 @@ const VoiceChatScreen = () => {
           headerStyle: { backgroundColor: 'black' },
           headerTintColor: 'white',
           headerLeft: () => (
-            <Pressable onPress={() => router.back()}>
+            <Pressable 
+              onPress={() => router.back()}
+              className="flex items-center justify-center w-10 h-10"
+              style={{
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <ArrowLeft size={24} color="white" />
             </Pressable>
           ),
           headerRight: () => (
-            <Pressable onPress={() => router.push('/voice-settings')}>
+            <Pressable 
+              onPress={() => router.push('/voice-settings')}
+              className="flex items-center justify-center w-10 h-10"
+              style={{
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <Settings size={24} color="white" />
             </Pressable>
           ),
@@ -1186,9 +1200,29 @@ const VoiceChatScreen = () => {
                   onPressIn={onPressIn}
                   onPressOut={onPressOut}
                   disabled={voiceState === 'transcribing' || voiceState === 'generating'}
-                  className={`w-32 h-32 rounded-full ${getButtonColor()} justify-center items-center shadow-lg`}
+                  className={`w-32 h-32 rounded-full ${getButtonColor()} shadow-lg`}
+                  style={{ 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    display: 'flex'
+                  }}
                 >
-                  <Mic size={48} color={getIconColor()} />
+                  <View style={{
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '100%',
+                    height: '100%',
+                    position: 'relative'
+                  }}>
+                    <View style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: [{ translateX: -24 }, { translateY: -24 }]
+                    }}>
+                      <Mic size={48} color={getIconColor()} />
+                    </View>
+                  </View>
                 </Pressable>
               </Animated.View>
             </View>

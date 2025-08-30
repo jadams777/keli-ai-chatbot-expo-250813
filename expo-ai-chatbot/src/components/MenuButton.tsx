@@ -1,7 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useColorScheme } from 'react-native';
 import { useStore } from '../lib/globalStore';
 
 interface MenuButtonProps {
@@ -13,8 +12,6 @@ export const MenuButton: React.FC<MenuButtonProps> = ({
   size = 24, 
   style 
 }) => {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { setSidebarVisible } = useStore();
 
   const handlePress = () => {
@@ -31,7 +28,7 @@ export const MenuButton: React.FC<MenuButtonProps> = ({
       <Ionicons
         name="menu"
         size={size}
-        color={isDark ? '#ffffff' : '#000000'}
+        color="#333333"
       />
     </TouchableOpacity>
   );

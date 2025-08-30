@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Pressable, TextInput, View, ScrollView } from "react-native";
+import { Pressable, TextInput, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack, useRouter } from "expo-router";
 import { generateUUID, type UIMessage } from "@/lib/utils";
@@ -10,7 +10,7 @@ import { SidebarDrawer } from "@/components/SidebarDrawer";
 import { MenuButton } from "@/components/MenuButton";
 import type { ScrollView as GHScrollView } from "react-native-gesture-handler";
 import { useStore } from "@/lib/globalStore";
-import { MessageCirclePlusIcon, Mic } from "lucide-react-native";
+import { Mic } from "lucide-react-native";
 import { useAIStreaming } from "@/hooks/useAIStreaming";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useColorScheme } from "@/lib/useColorScheme";
@@ -169,12 +169,19 @@ const HomePage = () => {
       <Stack.Screen
         options={{
           headerShown: true,
-          title: "Keli AI - Private Chat",
+          title: "Private Chat",
           headerLeft: () => (
             <MenuButton size={20} />
           ),
           headerRight: () => (
-            <Pressable onPress={() => router.push('/voice-chat')}>
+            <Pressable 
+              onPress={() => router.push('/voice-chat')}
+              className="flex items-center justify-center w-10 h-10"
+              style={{
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <Mic size={20} color={isDarkColorScheme ? "white" : "black"} />
             </Pressable>
           ),

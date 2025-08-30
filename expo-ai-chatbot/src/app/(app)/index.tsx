@@ -6,6 +6,8 @@ import { generateUUID, type UIMessage } from "@/lib/utils";
 import { ChatInterface } from "@/components/chat-interface";
 import { ChatInput } from "@/components/ui/chat-input";
 import { SuggestedActions } from "@/components/suggested-actions";
+import { SidebarDrawer } from "@/components/SidebarDrawer";
+import { MenuButton } from "@/components/MenuButton";
 import type { ScrollView as GHScrollView } from "react-native-gesture-handler";
 import { useStore } from "@/lib/globalStore";
 import { MessageCirclePlusIcon, Mic } from "lucide-react-native";
@@ -14,6 +16,7 @@ import Animated, { FadeIn } from "react-native-reanimated";
 import { useColorScheme } from "@/lib/useColorScheme";
 import { getSystemPrompt } from "@/lib/system-prompt";
 import { type CoreMessage } from "ai";
+import type { ChatSession } from "@/lib/globalStore";
 
 const HomePage = () => {
   const router = useRouter();
@@ -26,6 +29,9 @@ const HomePage = () => {
     streaming,
     setStreamingState,
     resetStreamingState,
+    saveCurrentSession,
+    loadChatSession,
+    loadChatHistory,
   } = useStore();
   const inputRef = useRef<TextInput>(null);
   const [messages, setMessages] = useState<UIMessage[]>([]);
@@ -36,7 +42,53 @@ const HomePage = () => {
     if (!chatId) {
       setChatId({ id: generateUUID(), from: "newChat" });
     }
+    // Load chat history on app start
+    loadChatHistory();
   }, []);
+
+  // Save current session when messages change
+  useEffect(() => {
+    if (messages.length > 0 && chatId) {
+      saveCurrentSession(messages);
+    }
+  }, [messages, chatId]);
+
+  const handleNewChat = useCallback(() => {
+    if (streaming.isStreaming) {
+      cancelStreaming();
+    }
+    setMessages([]);
+    resetStreamingState();
+    resetStreaming();
+    clearImageUris();
+    setTimeout(() => {
+      const newChatId = generateUUID();
+      setChatId({ id: newChatId, from: "newChat" });
+      inputRef.current?.focus();
+      setBottomChatHeightHandler(false);
+    }, 100);
+  }, [clearImageUris, setBottomChatHeightHandler, setChatId, streaming.isStreaming, cancelStreaming, resetStreamingState, resetStreaming]);
+
+  const handleSelectSession = useCallback((session: ChatSession) => {
+    // Save current session before switching
+    if (messages.length > 0 && chatId) {
+      saveCurrentSession(messages);
+    }
+    
+    // Load selected session
+    setMessages(session.messages);
+    setChatId({ id: session.id, from: "history" });
+    
+    // Stop any ongoing streaming
+    if (streaming.isStreaming) {
+      cancelStreaming();
+      resetStreamingState();
+    }
+  }, [messages, chatId, saveCurrentSession, setChatId, streaming.isStreaming, cancelStreaming, resetStreamingState]);
+
+  const handleNewChatFromSidebar = useCallback(() => {
+    handleNewChat();
+  }, [handleNewChat]);
 
   const handleSubmit = async () => {
     if (!input.trim()) return;
@@ -87,22 +139,6 @@ const HomePage = () => {
     }
   };
 
-  const handleNewChat = useCallback(() => {
-    if (streaming.isStreaming) {
-      cancelStreaming();
-    }
-    setMessages([]);
-    resetStreamingState();
-    resetStreaming();
-    clearImageUris();
-    setTimeout(() => {
-      const newChatId = generateUUID();
-      setChatId({ id: newChatId, from: "newChat" });
-      inputRef.current?.focus();
-      setBottomChatHeightHandler(false);
-    }, 100);
-  }, [clearImageUris, setBottomChatHeightHandler, setChatId, streaming.isStreaming, cancelStreaming, resetStreamingState, resetStreaming]);
-
   const { bottom } = useSafeAreaInsets();
   const scrollViewRef = useRef<GHScrollView>(null);
 
@@ -133,18 +169,13 @@ const HomePage = () => {
       <Stack.Screen
         options={{
           headerShown: true,
-          title: "hey",
+          title: "Keli AI - Private Chat",
           headerLeft: () => (
-            <Pressable onPress={() => router.push('/voice-chat')}>
-              <Mic size={20} color={isDarkColorScheme ? "white" : "black"} />
-            </Pressable>
+            <MenuButton size={20} />
           ),
           headerRight: () => (
-            <Pressable disabled={!messages.length} onPress={handleNewChat}>
-              <MessageCirclePlusIcon
-                size={20}
-                color={!messages.length ? (isDarkColorScheme ? "#666" : "#eee") : (isDarkColorScheme ? "white" : "black")}
-              />
+            <Pressable onPress={() => router.push('/voice-chat')}>
+              <Mic size={20} color={isDarkColorScheme ? "white" : "black"} />
             </Pressable>
           ),
         }}
@@ -189,6 +220,11 @@ const HomePage = () => {
           cancelStreaming();
           resetStreamingState();
         }}
+      />
+      
+      <SidebarDrawer
+        onSelectSession={handleSelectSession}
+        onNewChat={handleNewChatFromSidebar}
       />
     </Animated.View>
   );

@@ -23,11 +23,11 @@ export const WelcomeMessage = () => {
 
       <View className="space-y-4">
         <Text className="text-center leading-7">
-          👋 Hi there, I'm Keli, your friendly AI assistant. How can I help you today?
+          👋 Hi, I'm Keli, your friendly AI assistant. How can I help you today?
         </Text>
         {!hasZipCode() && (
           <Text className="text-center leading-7">
-            If you give me your zip code, I'll use it to personalize weather and local search results for you.
+            If you give me your zip code, I'll personalize weather and local search.
           </Text>
         )}
       </View>

@@ -79,21 +79,21 @@ export function SuggestedActions({
       // Default suggestions when no zip code is available
       return [
         {
-          title: "What's the weather forecast",
+          title: "What's the weather",
           label:
-            "Get detailed weather information for San Francisco, including temperature and wind speed.",
+            "Get detailed weather information for San Francisco.",
           action: "What is the weather in San Francisco today?",
         },
         {
           title: "Help me write an essay",
           label:
-            "Create a well-researched essay exploring Silicon Valley's history, tech culture, innovation ecosystem and global impact",
+            "Create a well-researched essay exploring Silicon Valley's history.",
           action: "Help me draft a short essay about Silicon Valley",
         },
         {
           title: "Get stock market analysis",
           label:
-            "Check current stock prices, market trends, trading volume and key financial metrics for any publicly traded company",
+            "Check current stock prices, market trends, & key financial metrics.",
           action: "What is the current stock price of Apple (AAPL)?",
         },
       ];

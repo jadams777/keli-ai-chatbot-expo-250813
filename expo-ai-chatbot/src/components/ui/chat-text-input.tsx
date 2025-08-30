@@ -28,6 +28,7 @@ const ChatTextInput = React.forwardRef<
     return (
       <Comp
         ref={ref as any}
+        textAlignVertical="center"
         className={cn(
           "native:h-20 native:text-lg native:leading-[1.25] h-20 rounded-md border border-input bg-background px-3 py-2 text-lg text-foreground file:border-0 file:bg-transparent file:font-medium placeholder:text-muted-foreground web:flex web:w-full lg:text-sm",
           "web:ring-offset-background web:focus-visible:outline-none web:focus-visible:ring-2 web:focus-visible:ring-ring web:focus-visible:ring-offset-2",

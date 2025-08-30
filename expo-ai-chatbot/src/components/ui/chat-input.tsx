@@ -173,7 +173,7 @@ export const ChatInput = forwardRef<TextInput, Props>(
       <KeyboardAvoidingView>
         <Animated.View style={animatedStyles}>
           <SelectedImages uris={selectedImageUris} onRemove={removeImageUri} />
-          <View className="flex-row items-end gap-2 bg-background px-4 py-2">
+          <View className="flex-row items-center gap-2 bg-background px-4 py-2">
             <ChatTextInput
               ref={ref}
               className="flex-1 rounded-[20] bg-muted py-[8]"
@@ -185,7 +185,7 @@ export const ChatInput = forwardRef<TextInput, Props>(
             {streaming.isStreaming ? (
               <Button
                 size="icon"
-                className="android:h-12 android:w-12 rounded-full bg-red-500 dark:bg-red-600"
+                className="h-14 w-14 rounded-full bg-red-500 dark:bg-red-600"
                 onPress={() => {
                   onStop?.();
                   Keyboard.dismiss();
@@ -193,7 +193,7 @@ export const ChatInput = forwardRef<TextInput, Props>(
               >
                 <Square
                   color="white"
-                  size={16}
+                  size={18}
                   className="h-4 w-4"
                   fill="white"
                 />
@@ -201,7 +201,7 @@ export const ChatInput = forwardRef<TextInput, Props>(
             ) : (
               <Button
                 size="icon"
-                className="android:h-12 android:w-12 rounded-full bg-black dark:bg-white"
+                className="h-14 w-14 rounded-full bg-black dark:bg-white"
                 onPress={() => {
                   onSubmit();
                   Keyboard.dismiss();
@@ -210,7 +210,7 @@ export const ChatInput = forwardRef<TextInput, Props>(
               >
                 <ArrowUp
                   color={colorScheme === "dark" ? "black" : "white"}
-                  size={20}
+                  size={22}
                   className="h-6 w-6"
                 />
               </Button>

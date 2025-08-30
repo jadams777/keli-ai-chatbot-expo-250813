@@ -20,11 +20,15 @@ export function SuggestedActions({
   hasInput = false,
   onSubmit,
 }: SuggestedActionsProps) {
-  const { selectedImageUris, setChatId } = useStore();
+  const { selectedImageUris, setChatId, location, loadZipCode } = useStore();
   const { width } = useWindowDimensions();
   const [cardWidth, setCardWidth] = useState(0);
 
   const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    loadZipCode();
+  }, []);
 
   useEffect(() => {
     opacity.value = withTiming(
@@ -47,26 +51,56 @@ export function SuggestedActions({
     onSubmit(action);
   };
 
-  const actions = [
-    {
-      title: "What's the weather forecast",
-      label:
-        "Get detailed weather information for San Francisco, including temperature and wind speed.",
-      action: "What is the weather in San Francisco today?",
-    },
-    {
-      title: "Help me write an essay",
-      label:
-        "Create a well-researched essay exploring Silicon Valley's history, tech culture, innovation ecosystem and global impact",
-      action: "Help me draft a short essay about Silicon Valley",
-    },
-    {
-      title: "Get stock market analysis",
-      label:
-        "Check current stock prices, market trends, trading volume and key financial metrics for any publicly traded company",
-      action: "What is the current stock price of Apple (AAPL)?",
-    },
-  ];
+  const getActions = () => {
+    if (location.zipCode) {
+      // Location-specific suggestions when zip code is available
+      return [
+        {
+          title: "Weather forecast",
+          label: `Get detailed weather information for your area (${location.zipCode}).`,
+          action: `What is the weather forecast for ${location.zipCode}?`,
+        },
+        {
+          title: "Top local restaurants",
+          label: `Discover top-rated restaurants and dining options in your area.`,
+          action: `What are some highly-rated restaurants near ${location.zipCode}?`,
+        },
+        {
+          title: "Fun things to do",
+          label: `Find exciting activities and events happening in your area.`,
+          action: `What are some fun things to do this weekend near ${location.zipCode}?`,
+        },        {
+          title: "Enjoy Live Music",
+          label: `Find upcoming live music performance in your area.`,
+          action: `Find upcoming live music performance near ${location.zipCode}`,
+        },
+      ];
+    } else {
+      // Default suggestions when no zip code is available
+      return [
+        {
+          title: "What's the weather forecast",
+          label:
+            "Get detailed weather information for San Francisco, including temperature and wind speed.",
+          action: "What is the weather in San Francisco today?",
+        },
+        {
+          title: "Help me write an essay",
+          label:
+            "Create a well-researched essay exploring Silicon Valley's history, tech culture, innovation ecosystem and global impact",
+          action: "Help me draft a short essay about Silicon Valley",
+        },
+        {
+          title: "Get stock market analysis",
+          label:
+            "Check current stock prices, market trends, trading volume and key financial metrics for any publicly traded company",
+          action: "What is the current stock price of Apple (AAPL)?",
+        },
+      ];
+    }
+  };
+
+  const actions = getActions();
 
   return (
     <Animated.View style={animatedStyle}>

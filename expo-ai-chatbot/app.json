@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "expo-ai-chatbot-lite",
-    "slug": "expo-ai-chatbot-lite",
+    "name": "Keli AI",
+    "slug": "keli-ai",
     "scheme": "lite.expoaichatbot.com",
     "userInterfaceStyle": "automatic",
     "orientation": "portrait",

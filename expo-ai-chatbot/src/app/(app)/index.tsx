@@ -32,6 +32,9 @@ const HomePage = () => {
     saveCurrentSession,
     loadChatSession,
     loadChatHistory,
+    detectZipCodeFromMessage,
+    setZipCode,
+    hasZipCode,
   } = useStore();
   const inputRef = useRef<TextInput>(null);
   const [messages, setMessages] = useState<UIMessage[]>([]);
@@ -98,6 +101,24 @@ const HomePage = () => {
       role: "user",
       content: input.trim(),
     };
+
+    // Check for zip code in user message and store it
+    const detectedZipCode = detectZipCodeFromMessage(input.trim());
+    if (detectedZipCode && !hasZipCode()) {
+      await setZipCode(detectedZipCode);
+      
+      // Add confirmation message
+      const confirmationMessage: UIMessage = {
+        id: generateUUID(),
+        role: "assistant",
+        content: "Thanks, I got it!",
+      };
+      
+      const newMessagesWithConfirmation = [...messages, userMessage, confirmationMessage];
+      setMessages(newMessagesWithConfirmation);
+      setInput("");
+      return; // Exit early to show only the confirmation
+    }
 
     const assistantMessage: UIMessage = {
       id: generateUUID(),

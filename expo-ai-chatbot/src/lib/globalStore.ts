@@ -20,7 +20,8 @@ export interface ChatSession {
 // Storage keys for AsyncStorage
 const STORAGE_KEYS = {
   CHAT_SESSIONS: '@chat_sessions',
-  CURRENT_CHAT_ID: '@current_chat_id'
+  CURRENT_CHAT_ID: '@current_chat_id',
+  USER_ZIP_CODE: '@user_zip_code'
 };
 
 export interface ToolCall {
@@ -49,6 +50,12 @@ type ChatHistoryState = {
   sidebarVisible: boolean;
   chatSessions: ChatSession[];
   currentSessionId: string | null;
+  isLoading: boolean;
+};
+
+// Location state for zip code management
+type LocationState = {
+  zipCode: string | null;
   isLoading: boolean;
 };
 
@@ -83,6 +90,12 @@ interface StoreState {
   saveChatHistory: () => Promise<void>;
   saveCurrentSession: (messages: UIMessage[]) => Promise<void>;
   loadChatSession: (sessionId: string) => ChatSession | null;
+  // Location state
+  location: LocationState;
+  setZipCode: (zipCode: string) => Promise<void>;
+  loadZipCode: () => Promise<void>;
+  detectZipCodeFromMessage: (message: string) => string | null;
+  hasZipCode: () => boolean;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -153,6 +166,11 @@ export const useStore = create<StoreState>((set) => ({
     sidebarVisible: false,
     chatSessions: [],
     currentSessionId: null,
+    isLoading: false,
+  },
+  // Location state
+  location: {
+    zipCode: null,
     isLoading: false,
   },
   setSidebarVisible: (visible: boolean) =>
@@ -279,5 +297,52 @@ export const useStore = create<StoreState>((set) => ({
   loadChatSession: (sessionId: string) => {
     const { chatHistory } = useStore.getState();
     return chatHistory.chatSessions.find((session) => session.id === sessionId) || null;
+  },
+  // Location methods
+  setZipCode: async (zipCode: string) => {
+    try {
+      set((state) => ({
+        location: { ...state.location, isLoading: true },
+      }));
+      
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_ZIP_CODE, zipCode);
+      
+      set((state) => ({
+        location: { zipCode, isLoading: false },
+      }));
+    } catch (error) {
+      console.error('Failed to save zip code:', error);
+      set((state) => ({
+        location: { ...state.location, isLoading: false },
+      }));
+    }
+  },
+  loadZipCode: async () => {
+    try {
+      set((state) => ({
+        location: { ...state.location, isLoading: true },
+      }));
+      
+      const zipCode = await AsyncStorage.getItem(STORAGE_KEYS.USER_ZIP_CODE);
+      
+      set((state) => ({
+        location: { zipCode, isLoading: false },
+      }));
+    } catch (error) {
+      console.error('Failed to load zip code:', error);
+      set((state) => ({
+        location: { ...state.location, isLoading: false },
+      }));
+    }
+  },
+  detectZipCodeFromMessage: (message: string) => {
+    // Regex to match 5-digit zip codes
+    const zipCodeRegex = /\b\d{5}\b/;
+    const match = message.match(zipCodeRegex);
+    return match ? match[0] : null;
+  },
+  hasZipCode: () => {
+    const { location } = useStore.getState();
+    return location.zipCode !== null && location.zipCode !== '';
   },
 }));

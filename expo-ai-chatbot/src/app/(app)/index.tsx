@@ -13,14 +13,17 @@ import { useStore } from "@/lib/globalStore";
 import { Mic } from "lucide-react-native";
 import { useAIStreaming } from "@/hooks/useAIStreaming";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { useColorScheme } from "@/lib/useColorScheme";
+import { useColorScheme } from "react-native";
+import { useColorScheme as useCustomColorScheme } from "@/lib/useColorScheme";
 import { getSystemPrompt } from "@/lib/system-prompt";
 import { type CoreMessage } from "ai";
 import type { ChatSession } from "@/lib/globalStore";
+import { emailService } from "@/lib/email-service";
 
 const HomePage = () => {
   const router = useRouter();
-  const { isDarkColorScheme } = useColorScheme();
+  const deviceColorScheme = useColorScheme();
+  const { isDarkColorScheme, colorScheme } = useCustomColorScheme();
   const {
     clearImageUris,
     setBottomChatHeightHandler,
@@ -39,6 +42,7 @@ const HomePage = () => {
   const inputRef = useRef<TextInput>(null);
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [input, setInput] = useState("");
+  const [awaitingFeedbackResponse, setAwaitingFeedbackResponse] = useState<string | null>(null);
   const { startStreaming, cancelStreaming, reset: resetStreaming } = useAIStreaming();
 
   useEffect(() => {
@@ -92,6 +96,25 @@ const HomePage = () => {
   const handleNewChatFromSidebar = useCallback(() => {
     handleNewChat();
   }, [handleNewChat]);
+
+  const handleFeedback = useCallback(async (messageId: string, type: 'positive' | 'negative') => {
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === messageId 
+          ? { 
+              ...msg, 
+              feedback: { 
+                type, 
+                isAwaitingResponse: false, // No longer awaiting response since we handle it immediately
+                hasResponded: type === 'positive' // Positive feedback is immediately complete
+              } 
+            }
+          : msg
+      )
+    );
+  }, []);
+
+
 
   const handleSubmit = async () => {
     if (!input.trim()) return;
@@ -191,9 +214,7 @@ const HomePage = () => {
         options={{
           headerShown: true,
           title: "Private Chat",
-          headerLeft: () => (
-            <MenuButton size={20} />
-          ),
+          headerLeft: () => <MenuButton size={20} />,
           headerRight: () => (
             <Pressable 
               onPress={() => router.push('/voice-chat')}
@@ -203,7 +224,7 @@ const HomePage = () => {
                 justifyContent: 'center',
               }}
             >
-              <Mic size={20} color={isDarkColorScheme ? "white" : "black"} />
+              <Mic size={20} color={isDarkColorScheme ? "#ffffff" : "#333333"} />
             </Pressable>
           ),
         }}
@@ -217,6 +238,7 @@ const HomePage = () => {
           scrollViewRef={scrollViewRef}
           isLoading={streaming.isStreaming}
           streamingMessageId={streaming.currentMessageId}
+          onFeedback={handleFeedback}
         />
       </ScrollView>
 

@@ -23,6 +23,11 @@ export interface UIMessage {
   content: string;
   toolInvocations?: Array<ToolInvocation>;
   annotations?: Array<any>;
+  feedback?: {
+    type?: 'positive' | 'negative' | null;
+    isAwaitingResponse?: boolean;
+    hasResponded?: boolean;
+  };
 }
 
 // Type definitions for database messages

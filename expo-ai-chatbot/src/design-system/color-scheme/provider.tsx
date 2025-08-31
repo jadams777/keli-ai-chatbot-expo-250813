@@ -25,6 +25,14 @@ export const toggleColorScheme = (isDark?: boolean) => {
   NavigationBar.setButtonStyleAsync(isDark ? "light" : "dark");
 };
 
+// Web-specific theme detection using CSS media queries
+const getWebSystemTheme = (): 'light' | 'dark' => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return 'light';
+};
+
 export function ColorSchemeProvider({
   children,
 }: {
@@ -38,9 +46,30 @@ export function ColorSchemeProvider({
 
   useEffect(() => {
     getPersistedColorScheme().then((persistedScheme) => {
-      if (persistedScheme) setColorScheme(persistedScheme);
+      const appearanceTheme = Appearance.getColorScheme();
+      const webSystemTheme = getWebSystemTheme();
+      const disabledSystemTheme = getDisabledSystemTheme();
+      
+      // Clear any persisted scheme and use actual system theme
+      deleteDisabledSystemTheme();
+      
+      // Use web-specific detection for web platform, fallback to device scheme for mobile
+      const actualSystemTheme = Platform.OS === 'web' ? webSystemTheme : (deviceColorScheme || 'light');
+      setColorScheme(actualSystemTheme);
+      
+      // Force the correct theme immediately
+      const isDark = actualSystemTheme === 'dark';
+      if (isDark) {
+        toggleColorScheme(isDark);
+        SystemUI.setBackgroundColorAsync('black');
+        nativewind.setColorScheme('dark');
+      } else {
+        toggleColorScheme();
+        SystemUI.setBackgroundColorAsync('white');
+        nativewind.setColorScheme('light');
+      }
     });
-  }, []);
+  }, [deviceColorScheme, nativewind]);
 
   const changeTheme = useCallback(
     (newColorScheme: ColorSchemeName) => {
@@ -48,16 +77,15 @@ export function ColorSchemeProvider({
       persistColorScheme(newColorScheme);
       setColorScheme(newColorScheme);
       const isDark = newColorScheme === "dark";
-      // TODO: build error: comment for now
-      // if (isDark) {
-      //   toggleColorScheme(isDark);
-      //   SystemUI.setBackgroundColorAsync("black");
-      //   nativewind.setColorScheme("dark");
-      // } else {
-      //   toggleColorScheme();
-      //   SystemUI.setBackgroundColorAsync("white");
-      //   nativewind.setColorScheme("light");
-      // }
+      if (isDark) {
+        toggleColorScheme(isDark);
+        SystemUI.setBackgroundColorAsync("black");
+        nativewind.setColorScheme("dark");
+      } else {
+        toggleColorScheme();
+        SystemUI.setBackgroundColorAsync("white");
+        nativewind.setColorScheme("light");
+      }
     },
     [nativewind]
   );
@@ -65,7 +93,12 @@ export function ColorSchemeProvider({
   useEffect(() => {
     const themeChangeListener = () => {
       const theme = Appearance.getColorScheme();
-      changeTheme(theme && !getDisabledSystemTheme() ? theme : colorScheme);
+      const webSystemTheme = getWebSystemTheme();
+      const disabledSystemTheme = getDisabledSystemTheme();
+      
+      // Use web-specific detection for theme changes on web platform
+      const actualTheme = Platform.OS === 'web' ? webSystemTheme : (theme && !disabledSystemTheme ? theme : colorScheme);
+      changeTheme(actualTheme);
     };
     themeChangeListener();
     const appearanceListener =
@@ -74,7 +107,7 @@ export function ColorSchemeProvider({
       // @ts-ignore
       appearanceListener.remove();
     };
-  }, [changeTheme, colorScheme]);
+  }, [changeTheme, colorScheme, deviceColorScheme]);
 
   const handleColorSchemeChange = (newColorScheme: ColorSchemeName) => {
     if (newColorScheme) {

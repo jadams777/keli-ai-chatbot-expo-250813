@@ -8,6 +8,7 @@ import React, { forwardRef } from "react";
 import { LottieLoader } from "@/components/lottie-loader";
 import { useStore } from "@/lib/globalStore";
 import { ToolCallIndicator } from "@/components/ui/tool-call-indicator";
+import { FeedbackButtons } from "@/components/feedback-buttons";
 
 import { type UIMessage } from "@/lib/utils";
 
@@ -16,10 +17,11 @@ type ChatInterfaceProps = {
   scrollViewRef: React.RefObject<ScrollView>;
   isLoading?: boolean;
   streamingMessageId?: string | null;
+  onFeedback?: (messageId: string, type: 'positive' | 'negative') => void;
 };
 
 export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
-  ({ messages, scrollViewRef }, ref) => {
+  ({ messages, scrollViewRef, onFeedback }, ref) => {
     const { keyboardShown, keyboardHeight } = useKeyboard();
     const { streaming } = useStore();
 
@@ -34,7 +36,7 @@ export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
               <React.Fragment key={m.id}>
                 {/* Render message content */}
                 <View
-                  className={`flex-row px-4 ${m.role === "user" ? "ml-auto max-w-[85%]" : "max-w-[95%] pl-0"} rounded-3xl ${m.role === "user" ? "bg-muted/50" : ""}`}
+                  className={`flex-row px-4 ${m.role === "user" ? "ml-auto max-w-[85%]" : "max-w-[95%] pl-0 items-start"} rounded-3xl ${m.role === "user" ? "bg-muted/50" : ""}`}
                 >
                   {m.content.length > 0 && (
                     <>
@@ -42,25 +44,36 @@ export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
                         className={
                           m.role === "user"
                             ? ""
-                            : "mr-2 mt-1 h-8 w-8 items-center justify-center rounded-full bg-gray-200"
+                            : "mr-2 mt-3 h-8 w-8 items-center justify-center rounded-full bg-gray-200"
                         }
                       >
                         <Text className="text-lg">
                           {m.role === "user" ? "" : "🤖"}
                         </Text>
                       </View>
-                      <CustomMarkdown
-                        content={
-                          streaming.isStreaming &&
-                          streaming.currentMessageId === m.id &&
-                          m.role === "assistant"
-                            ? streaming.streamingText || m.content
-                            : m.content
-                        }
-                      />
+                      <View className="flex-1">
+                        <CustomMarkdown
+                          content={
+                            streaming.isStreaming &&
+                            streaming.currentMessageId === m.id &&
+                            m.role === "assistant"
+                              ? streaming.streamingText || m.content
+                              : m.content
+                          }
+                        />
+                      </View>
                     </>
                   )}
                 </View>
+                
+                {/* Render feedback buttons for assistant messages */}
+                {onFeedback && m.role === "assistant" && !(streaming.isStreaming && streaming.currentMessageId === m.id) && (
+                  <FeedbackButtons 
+                    message={m} 
+                    onFeedback={onFeedback}
+                    messages={messages}
+                  />
+                )}
               </React.Fragment>
             ))}
 
@@ -91,7 +104,7 @@ export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
                 // and the assistant message has started streaming.
                 !streaming.toolCalls?.some(call => !call.result) && (
                   <View className="flex-row">
-                    <View className="mr-2 mt-1 h-8 w-8 items-center justify-center rounded-full bg-gray-200">
+                    <View className="mr-2 mt-2 h-8 w-8 items-center justify-center rounded-full bg-gray-200">
                       <Text className="text-lg">{"🤖"}</Text>
                     </View>
                     <View className="-ml-2 -mt-[1px]">

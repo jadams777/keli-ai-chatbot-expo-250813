@@ -11,7 +11,9 @@
       "output": "server",
       "bundler": "metro"
     },
-    "assetBundlePatterns": ["src/assets/**/*"],
+    "assetBundlePatterns": [
+      "src/assets/**/*"
+    ],
     "plugins": [
       [
         "expo-router",
@@ -54,7 +56,8 @@
           "calendarPermission": "This app needs access to your calendar to help you manage events and schedules.",
           "remindersPermission": "This app needs access to your reminders to help you manage tasks and notifications."
         }
-      ]
+      ],
+      "expo-mail-composer"
     ],
     "experiments": {
       "typedRoutes": true

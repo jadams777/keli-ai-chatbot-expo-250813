@@ -13,11 +13,11 @@ export const MenuButton: React.FC<MenuButtonProps> = ({
   size = 24, 
   style 
 }) => {
-  const { setSidebarVisible } = useStore();
+  const { setSidebarVisible, chatHistory } = useStore();
   const { isDarkColorScheme } = useColorScheme();
 
   const handlePress = () => {
-    setSidebarVisible(true);
+    setSidebarVisible(!chatHistory.sidebarVisible);
   };
 
   return (

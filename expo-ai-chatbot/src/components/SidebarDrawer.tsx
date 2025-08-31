@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -41,16 +41,22 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
     loadChatHistory,
   } = useStore();
 
+  const [shouldRender, setShouldRender] = useState(false);
   const translateX = useSharedValue(-SIDEBAR_WIDTH);
   const overlayOpacity = useSharedValue(0);
 
   useEffect(() => {
     if (chatHistory.sidebarVisible) {
+      setShouldRender(true);
       translateX.value = withTiming(0, { duration: 300 });
       overlayOpacity.value = withTiming(0.5, { duration: 300 });
     } else {
       translateX.value = withTiming(-SIDEBAR_WIDTH, { duration: 300 });
-      overlayOpacity.value = withTiming(0, { duration: 300 });
+      overlayOpacity.value = withTiming(0, { duration: 300 }, undefined, (finished) => {
+        if (finished) {
+          runOnJS(setShouldRender)(false);
+        }
+      });
     }
   }, [chatHistory.sidebarVisible]);
 
@@ -101,7 +107,7 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
     }
   };
 
-  if (!chatHistory.sidebarVisible) {
+  if (!shouldRender) {
     return null;
   }
 

@@ -44,7 +44,7 @@ export const ChatInterface = forwardRef<ScrollView, ChatInterfaceProps>(
                         className={
                           m.role === "user"
                             ? ""
-                            : "mr-2 mt-3 h-8 w-8 items-center justify-center rounded-full bg-gray-200"
+                            : "mr-4 mt-3 h-8 w-8 items-center justify-center rounded-full bg-gray-200"
                         }
                       >
                         <Text className="text-lg">

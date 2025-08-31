@@ -22,11 +22,13 @@ export function FeedbackButtons({ message, onFeedback, messages }: FeedbackButto
   // Don't show buttons if feedback has already been given
   if (message.feedback?.type) {
     return (
-      <View className="flex-row items-center mt-2 px-12">
-        <Text className="text-lg text-gray-500">
+      <View className="flex-row items-center mt-2 px-3">
+        <Text className="text-sm text-gray-500">
           {message.feedback.type === 'positive' 
             ? 'Thanks for your feedback!' 
-            : 'Thanks for your feedback! It helps me improve.'
+            : message.feedback.hasResponded 
+              ? 'Thanks for your feedback! It helps me improve.'
+              : 'How can I do better next time?'
           }
         </Text>
       </View>
@@ -51,52 +53,60 @@ export function FeedbackButtons({ message, onFeedback, messages }: FeedbackButto
 
   return (
     <>
-      <View className="flex-row items-center mt-0 px-10">
+      <View className="flex-row items-center mt-2 px-3 space-x-4">
         <TouchableOpacity
           onPress={() => onFeedback(message.id, 'positive')}
-          className="p-1 mr-8"
+          className="flex-row items-center space-x-1 p-2 rounded-lg bg-gray-100 active:bg-gray-200"
+          activeOpacity={0.7}
         >
-          <ThumbsUp size={25} color="#6b7280" />
+          <ThumbsUp size={16} color="#10b981" />
+          <Text className="text-sm text-gray-600">Helpful</Text>
         </TouchableOpacity>
+        
         <TouchableOpacity
           onPress={() => setShowFeedbackForm(true)}
-          className="p-1"
+          className="flex-row items-center space-x-1 p-2 rounded-lg bg-gray-100 active:bg-gray-200"
+          activeOpacity={0.7}
         >
-          <ThumbsDown size={25} color="#6b7280" />
+          <ThumbsDown size={16} color="#ef4444" />
+          <Text className="text-sm text-gray-600">Not helpful</Text>
         </TouchableOpacity>
       </View>
       
       {showFeedbackForm && (
-        <View className="mt-4">
-          <Text className="text-lg text-gray-400 mb-2">
-            How can I do better next time?
+        <View className="mt-4 px-3 py-4 bg-gray-50 rounded-lg mx-3">
+          <Text className="font-medium text-gray-700 mb-2">
+            How can we do better next time?
           </Text>
           <TextInput
             value={feedbackText}
             onChangeText={setFeedbackText}
+            // placeholder="Please share your feedback..."
             multiline
             numberOfLines={3}
-            className="border border-gray-300 p-3 mb-3 text-black dark:text-white"
+            className="border border-gray-300 rounded-lg p-3 bg-white mb-3 text-gray-800"
             style={{ textAlignVertical: 'top' }}
           />
-          <View className="flex-row justify-end space-x-4">
+          <View className="flex-row justify-end space-x-2">
             <TouchableOpacity
               onPress={() => {
                 setShowFeedbackForm(false);
                 setFeedbackText('');
               }}
-              className="mr-4"
+              className="px-4 py-2 rounded-lg bg-gray-200"
             >
-              <Text className="text-base font-bold text-gray-600 dark:text-gray-400">Cancel</Text>
+              <Text className="text-sm text-gray-600">Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleFeedbackSubmit}
               disabled={isSubmitting || !feedbackText.trim()}
-              className="flex-row items-center space-x-1"
+              className={`px-4 py-2 rounded-lg flex-row items-center space-x-1 ${
+                isSubmitting || !feedbackText.trim() ? 'bg-gray-300' : 'bg-blue-500'
+              }`}
             >
-              <Send size={14} color={isSubmitting || !feedbackText.trim() ? '#9ca3af' : '#3b82f6'} />
-              <Text className={`text-base font-bold ${
-                isSubmitting || !feedbackText.trim() ? 'text-gray-500 dark:text-gray-400' : 'text-blue-500 dark:text-blue-400'
+              <Send size={14} color={isSubmitting || !feedbackText.trim() ? '#9ca3af' : 'white'} />
+              <Text className={`text-sm ${
+                isSubmitting || !feedbackText.trim() ? 'text-gray-500' : 'text-white'
               }`}>
                 {isSubmitting ? 'Sending...' : 'Submit'}
               </Text>

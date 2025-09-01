@@ -2,7 +2,7 @@
   "expo": {
     "name": "Keli AI",
     "slug": "keli-ai",
-    "scheme": "lite.expoaichatbot.com",
+    "scheme": "com.keliaiexpochatbot.lite",
     "userInterfaceStyle": "automatic",
     "orientation": "portrait",
     "version": "0.0.1",

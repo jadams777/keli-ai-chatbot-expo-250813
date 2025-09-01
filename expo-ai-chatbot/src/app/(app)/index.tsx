@@ -273,6 +273,14 @@ const HomePage = () => {
               handleSubmit();
             });
           }}
+          onDirectAssistantMessage={(message) => {
+            const assistantMessage: UIMessage = {
+              id: generateUUID(),
+              role: "assistant",
+              content: message,
+            };
+            setMessages([assistantMessage]);
+          }}
         />
       )}
 

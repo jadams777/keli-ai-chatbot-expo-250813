@@ -14,11 +14,13 @@ import { generateUUID } from "@/lib/utils";
 interface SuggestedActionsProps {
   hasInput?: boolean;
   onSubmit: (message: string) => void;
+  onDirectAssistantMessage?: (message: string) => void;
 }
 
 export function SuggestedActions({
   hasInput = false,
   onSubmit,
+  onDirectAssistantMessage,
 }: SuggestedActionsProps) {
   const { selectedImageUris, setChatId, location, loadZipCode } = useStore();
   const { width } = useWindowDimensions();
@@ -43,7 +45,13 @@ export function SuggestedActions({
     opacity: opacity.value,
   }));
 
-  const handlePress = (action: string) => {
+  const handlePress = (action: string, title: string) => {
+    // Special handling for "What can Keli do?" action
+    if (title === "What can Keli do?" && onDirectAssistantMessage) {
+      onDirectAssistantMessage(action);
+      return;
+    }
+    
     const newChatId = generateUUID();
     setChatId({ id: newChatId, from: "newChat" });
     
@@ -55,6 +63,11 @@ export function SuggestedActions({
     if (location.zipCode) {
       // Location-specific suggestions when zip code is available
       return [
+        {
+          title: "What can Keli do?",
+          label: "Discover how Keli can help you with daily tasks and information.",
+          action: "Hi, I'm Keli, your helpful AI assistant! Here's what I can help you with:\n\n🌤️ **Weather & Forecasts**: Get current weather conditions and multi-day forecasts for any location\n\n🔍 **Web Search**: Find current information, news, facts, and answers to your questions from across the internet\n\n📍 **Location Services**: Discover nearby restaurants, entertainment, activities, and local recommendations based on your area\n\n📅 **Calendar Management**: View your schedule, create new events, update existing appointments, and delete calendar entries\n\n💬 **General Assistant**: Answer questions, help with writing, provide explanations, and assist with various daily tasks\n\nJust ask me anything - I'm here to help make your day easier and more productive!",
+        },
         {
           title: "Weather forecast",
           label: `Get detailed weather information for your area (${location.zipCode}).`,
@@ -78,6 +91,11 @@ export function SuggestedActions({
     } else {
       // Default suggestions when no zip code is available
       return [
+        {
+          title: "What can Keli do?",
+          label: "Discover how Keli can help you with daily tasks and information.",
+          action: "Hi, I'm Keli, your helpful AI assistant! Here's what I can help you with:\n\n🌤️ **Weather & Forecasts**: Get current weather conditions and multi-day forecasts for any location\n\n🔍 **Web Search**: Find current information, news, facts, and answers to your questions from across the internet\n\n📍 **Location Services**: Discover nearby restaurants, entertainment, activities, and local recommendations based on your area\n\n📅 **Calendar Management**: View your schedule, create new events, update existing appointments, and delete calendar entries\n\n💬 **General Assistant**: Answer questions, help with writing, provide explanations, and assist with various daily tasks\n\nJust ask me anything - I'm here to help make your day easier and more productive!",
+        },
         {
           title: "What's the weather",
           label:
@@ -110,7 +128,7 @@ export function SuggestedActions({
     >
       <ScrollAdapt withSnap itemWidth={cardWidth}>
         {actions.map((item, i) => (
-          <Pressable key={item.action} onPress={() => handlePress(item.action)}>
+          <Pressable key={item.action} onPress={() => handlePress(item.action, item.title)}>
             <View
               onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}
               className={cn(

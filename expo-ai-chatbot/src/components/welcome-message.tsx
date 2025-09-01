@@ -26,7 +26,7 @@ export const WelcomeMessage = () => {
           👋 Hi, I'm Keli, your friendly AI assistant. How can I help you today?
         </Text>
         {!hasZipCode() && (
-          <Text className="text-center leading-7">
+          <Text className="text-center leading-7 mt-4">
             If you give me your zip code, I'll personalize weather and local search.
           </Text>
         )}

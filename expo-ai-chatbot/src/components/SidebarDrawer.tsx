@@ -25,11 +25,13 @@ const SIDEBAR_WIDTH = Math.min(280, SCREEN_WIDTH * 0.8);
 interface SidebarDrawerProps {
   onSelectSession: (session: ChatSession) => void;
   onNewChat: () => void;
+  isStreaming?: boolean;
 }
 
 export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   onSelectSession,
   onNewChat,
+  isStreaming = false,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -51,9 +53,15 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
       translateX.value = withTiming(0, { duration: 300 });
       overlayOpacity.value = withTiming(0.5, { duration: 300 });
     } else {
-      translateX.value = withTiming(-SIDEBAR_WIDTH, { duration: 300 });
-      overlayOpacity.value = withTiming(0, { duration: 300 }, undefined, (finished) => {
+      translateX.value = withTiming(-SIDEBAR_WIDTH, { duration: 300 }, (finished) => {
         if (finished) {
+          // Ensure we unmount after animation completes
+          runOnJS(setShouldRender)(false);
+        }
+      });
+      overlayOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+        if (finished) {
+          // Also ensure overlay unmount state is set when opacity reaches 0
           runOnJS(setShouldRender)(false);
         }
       });
@@ -65,6 +73,11 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   }, []);
 
   const handleClose = () => {
+    // Prevent closing sidebar during streaming
+    if (isStreaming) {
+      console.log('[SidebarDrawer] Preventing sidebar close during streaming');
+      return;
+    }
     setSidebarVisible(false);
   };
 
@@ -78,6 +91,11 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   };
 
   const handleNewChat = () => {
+    // Prevent new chat creation during streaming
+    if (isStreaming) {
+      console.log('[SidebarDrawer] Preventing new chat during streaming');
+      return;
+    }
     onNewChat();
     setSidebarVisible(false);
   };
@@ -116,11 +134,14 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
       {/* Overlay */}
       <Animated.View
         style={[styles.overlay, overlayAnimatedStyle]}
+        // Don't block touches when sidebar is closed or closing
+        pointerEvents={chatHistory.sidebarVisible ? 'auto' : 'none'}
       >
         <TouchableOpacity
           style={styles.overlayTouchable}
           onPress={handleClose}
           activeOpacity={1}
+          disabled={isStreaming}
         />
       </Animated.View>
 
@@ -150,7 +171,11 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
           >
             Chat History
           </Text>
-          <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+          <TouchableOpacity 
+            onPress={handleClose} 
+            style={styles.closeButton}
+            disabled={isStreaming}
+          >
             <Ionicons
               name="close"
               size={24}
@@ -166,9 +191,11 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
             {
               backgroundColor: isDark ? '#333333' : '#f0f0f0',
               borderColor: isDark ? '#444444' : '#d0d0d0',
+              opacity: isStreaming ? 0.5 : 1,
             },
           ]}
           onPress={handleNewChat}
+          disabled={isStreaming}
         >
           <Ionicons
             name="add"

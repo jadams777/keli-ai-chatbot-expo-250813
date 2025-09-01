@@ -43,15 +43,23 @@ export function useAIStreaming() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const startStreaming = useCallback(async (options: StreamingOptions) => {
+    console.log('[useAIStreaming] startStreaming called with:', {
+      messagesCount: options.messages.length,
+      isCurrentlyStreaming: state.isStreaming
+    });
+    
     try {
+      console.log('[useAIStreaming] Setting initial streaming state');
       setState({ isStreaming: true, text: '', content: '', error: null, isLocal: false, modelName: '', toolCalls: [] });
       setStreamingState({ isStreaming: true, streamingText: '', error: null });
 
+      console.log('[useAIStreaming] Getting available provider');
       const { provider, isLocal, modelName } = await getAvailableProvider();
       const modelConfig = getModelConfig(modelName);
 
       setState(prev => ({ ...prev, isLocal, modelName }));
 
+      console.log('[useAIStreaming] Creating new AbortController');
       abortControllerRef.current = new AbortController();
 
       if (isLocal && modelName === 'apple-intelligence') {
@@ -129,16 +137,21 @@ export function useAIStreaming() {
   }, [setStreamingState]);
 
   const cancelStreaming = useCallback(() => {
+    console.log('[useAIStreaming] cancelStreaming called');
     if (abortControllerRef.current) {
+      console.log('[useAIStreaming] Aborting current request');
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
-  }, []);
-
-  const reset = useCallback(() => {
-    cancelStreaming();
+    console.log('[useAIStreaming] Resetting streaming state');
     setState({ isStreaming: false, text: '', content: '', error: null, isLocal: false, modelName: '', toolCalls: [] });
     resetStreamingState();
+  }, [resetStreamingState]);
+
+  const reset = useCallback(() => {
+    console.log('[useAIStreaming] reset called');
+    console.log('[useAIStreaming] reset called from:', new Error().stack);
+    cancelStreaming();
   }, [cancelStreaming, resetStreamingState]);
 
   return {

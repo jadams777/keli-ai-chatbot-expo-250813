@@ -68,12 +68,11 @@ const HomePage = () => {
     resetStreamingState();
     resetStreaming();
     clearImageUris();
-    setTimeout(() => {
-      const newChatId = generateUUID();
-      setChatId({ id: newChatId, from: "newChat" });
-      inputRef.current?.focus();
-      setBottomChatHeightHandler(false);
-    }, 100);
+    
+    const newChatId = generateUUID();
+    setChatId({ id: newChatId, from: "newChat" });
+    inputRef.current?.focus();
+    setBottomChatHeightHandler(false);
   }, [clearImageUris, setBottomChatHeightHandler, setChatId, streaming.isStreaming, cancelStreaming, resetStreamingState, resetStreaming]);
 
   const handleSelectSession = useCallback((session: ChatSession) => {
@@ -116,18 +115,32 @@ const HomePage = () => {
 
 
 
-  const handleSubmit = async () => {
-    if (!input.trim()) return;
+  const handleSubmit = useCallback(async () => {
+    console.log('[handleSubmit] Function called with:', {
+      inputTrimmed: input.trim(),
+      inputLength: input.length,
+      messagesCount: messages.length,
+      streamingState: streaming
+    });
+    
+    if (!input.trim()) {
+      console.log('[handleSubmit] Early return - no input');
+      return;
+    }
 
+    console.log('[handleSubmit] Creating user message...');
     const userMessage: UIMessage = {
       id: generateUUID(),
       role: "user",
       content: input.trim(),
     };
+    console.log('[handleSubmit] User message created:', userMessage);
 
     // Check for zip code in user message and store it
+    console.log('[handleSubmit] Detecting zip code...');
     const detectedZipCode = detectZipCodeFromMessage(input.trim());
     if (detectedZipCode && !hasZipCode()) {
+      console.log('[handleSubmit] Setting zip code:', detectedZipCode);
       await setZipCode(detectedZipCode);
       
       // Add confirmation message
@@ -138,6 +151,7 @@ const HomePage = () => {
       };
       
       const newMessagesWithConfirmation = [...messages, userMessage, confirmationMessage];
+      console.log('[handleSubmit] Setting confirmation messages, count:', newMessagesWithConfirmation.length);
       setMessages(newMessagesWithConfirmation);
       setInput("");
       return; // Exit early to show only the confirmation
@@ -150,6 +164,7 @@ const HomePage = () => {
     };
 
     const newMessages = [...messages, userMessage];
+    console.log('[handleSubmit] Setting new messages, count:', newMessages.length + 1);
     setMessages([...newMessages, assistantMessage]);
 
     setStreamingState({
@@ -159,21 +174,31 @@ const HomePage = () => {
       error: null,
     });
 
+    console.log('[handleSubmit] Clearing input...');
     setInput("");
 
     // Prepare messages for the AI
     const history = newMessages.slice(-5); // Get the last 5 messages
     const coreMessages: CoreMessage[] = history.map(m => ({ role: m.role, content: m.content }));
 
+    console.log('[handleSubmit] Getting system prompt...');
+    const systemPrompt = getSystemPrompt();
+    console.log('[handleSubmit] System prompt length:', systemPrompt.length);
+
     try {
+      console.log('[handleSubmit] Starting streaming with:', {
+        messagesCount: coreMessages.length + 1,
+        systemPromptLength: systemPrompt.length
+      });
       await startStreaming({
         messages: [
-          { role: 'system', content: getSystemPrompt() },
+          { role: 'system', content: systemPrompt },
           ...coreMessages
         ],
       });
+      console.log('[handleSubmit] Streaming started successfully');
     } catch (error) {
-      console.error("Streaming error:", error);
+      console.error('[handleSubmit] Error starting streaming:', error);
       setStreamingState({
         isStreaming: false,
         currentMessageId: null,
@@ -181,16 +206,12 @@ const HomePage = () => {
         error: error instanceof Error ? error.message : "An error occurred",
       });
     }
-  };
+  }, [input, messages, setInput, setMessages, setStreamingState, detectZipCodeFromMessage, hasZipCode, setZipCode, startStreaming, getSystemPrompt]);
 
   const { bottom } = useSafeAreaInsets();
   const scrollViewRef = useRef<GHScrollView>(null);
 
-  useEffect(() => {
-    if (chatId) {
-      setMessages([] as UIMessage[]);
-    }
-  }, [chatId, setMessages]);
+
 
   useEffect(() => {
     if (streaming.currentMessageId && streaming.streamingText) {
@@ -247,9 +268,10 @@ const HomePage = () => {
           hasInput={!!input}
           onSubmit={(message) => {
             setInput(message);
-            setTimeout(() => {
+            // Use requestAnimationFrame for better timing instead of setTimeout
+            requestAnimationFrame(() => {
               handleSubmit();
-            }, 100);
+            });
           }}
         />
       )}
@@ -275,6 +297,7 @@ const HomePage = () => {
       <SidebarDrawer
         onSelectSession={handleSelectSession}
         onNewChat={handleNewChatFromSidebar}
+        isStreaming={streaming.isStreaming}
       />
     </Animated.View>
   );

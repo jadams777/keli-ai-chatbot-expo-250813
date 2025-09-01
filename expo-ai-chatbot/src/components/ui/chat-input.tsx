@@ -120,10 +120,17 @@ export const ChatInput = forwardRef<TextInput, Props>(
     { input, onChangeText, onSubmit, onStop, scrollViewRef, focusOnMount = false, isStreaming = false },
     ref,
   ) => {
+    console.log('[ChatInput] Component rendered with props:', {
+      input: input?.slice(0, 50) + (input?.length > 50 ? '...' : ''),
+      hasOnSubmit: !!onSubmit,
+      hasOnStop: !!onStop,
+      isStreaming
+    });
+    
     const { bottom } = useSafeAreaInsets();
     const keyboard = useAnimatedKeyboard();
     const { pickImage } = useImagePicker();
-    const { selectedImageUris, addImageUri, removeImageUri, streaming } = useStore();
+    const { selectedImageUris, addImageUri, removeImageUri } = useStore();
 
     useEffect(() => {
       if (focusOnMount) {
@@ -169,6 +176,23 @@ export const ChatInput = forwardRef<TextInput, Props>(
       }
     };
 
+    const handleSubmit = () => {
+      console.log('[ChatInput] handleSubmit called with:', {
+        inputTrimmed: input.trim(),
+        inputLength: input.length,
+        selectedImageUrisCount: selectedImageUris.length,
+        hasOnSubmit: !!onSubmit
+      });
+      
+      if (input.trim() || selectedImageUris.length > 0) {
+        console.log('[ChatInput] Calling onSubmit...');
+        onSubmit();
+        console.log('[ChatInput] onSubmit called successfully');
+      } else {
+        console.log('[ChatInput] Submit blocked - no input or images');
+      }
+    };
+
     return (
       <KeyboardAvoidingView>
         <Animated.View style={animatedStyles}>
@@ -182,7 +206,7 @@ export const ChatInput = forwardRef<TextInput, Props>(
               value={input}
               onChangeText={onChangeText}
             />
-            {streaming.isStreaming ? (
+            {isStreaming ? (
               <Button
                 size="icon"
                 className="h-14 w-14 rounded-full bg-red-500 dark:bg-red-600"
@@ -203,7 +227,7 @@ export const ChatInput = forwardRef<TextInput, Props>(
                 size="icon"
                 className="h-14 w-14 rounded-full bg-black dark:bg-white"
                 onPress={() => {
-                  onSubmit();
+                  handleSubmit();
                   Keyboard.dismiss();
                 }}
                 disabled={!input.trim() && selectedImageUris.length === 0}

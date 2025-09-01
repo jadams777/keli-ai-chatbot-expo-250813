@@ -103,7 +103,11 @@ export function SuggestedActions({
   const actions = getActions();
 
   return (
-    <Animated.View style={animatedStyle}>
+    <Animated.View
+      style={animatedStyle}
+      // Prevent invisible overlay from blocking touches when user is typing or has images
+      pointerEvents={hasInput || selectedImageUris.length > 0 ? 'none' : 'auto'}
+    >
       <ScrollAdapt withSnap itemWidth={cardWidth}>
         {actions.map((item, i) => (
           <Pressable key={item.action} onPress={() => handlePress(item.action)}>

@@ -354,7 +354,9 @@ const VoiceChatScreen = () => {
           debugLog('Error', 'Failed to stop InCallManager on blur', { error: error.message });
         }
         stopPlayback();
-        reset();
+        // Only reset local voice chat state, not global streaming state
+        resetVoiceChatState(setVoiceState, setStatusText, setRecording);
+        setRetryCount(0);
       };
     }, [stopPlayback])
   );

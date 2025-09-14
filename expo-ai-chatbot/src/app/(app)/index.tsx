@@ -18,7 +18,8 @@ import { useColorScheme as useCustomColorScheme } from "@/lib/useColorScheme";
 import { getSystemPrompt } from "@/lib/system-prompt";
 import { type CoreMessage } from "ai";
 import type { ChatSession } from "@/lib/globalStore";
-import { emailService } from "@/lib/email-service";
+import { adapty } from 'react-native-adapty';
+// import { emailService } from "@/lib/email-service";
 
 const HomePage = () => {
   const router = useRouter();
@@ -51,6 +52,12 @@ const HomePage = () => {
     }
     // Load chat history on app start
     loadChatHistory();
+    
+    // Initialize Adapty SDK
+    const adaptyKey = process.env.EXPO_PUBLIC_ADAPTY_SDK_KEY;
+    if (adaptyKey) {
+      adapty.activate(adaptyKey);
+    }
   }, []);
 
   // Save current session when messages change

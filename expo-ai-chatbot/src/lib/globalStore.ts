@@ -21,7 +21,9 @@ export interface ChatSession {
 const STORAGE_KEYS = {
   CHAT_SESSIONS: '@chat_sessions',
   CURRENT_CHAT_ID: '@current_chat_id',
-  USER_ZIP_CODE: '@user_zip_code'
+  USER_ZIP_CODE: '@user_zip_code',
+  DAILY_MESSAGE_COUNT: '@daily_message_count',
+  LAST_MESSAGE_DATE: '@last_message_date'
 };
 
 export interface ToolCall {
@@ -56,6 +58,13 @@ type ChatHistoryState = {
 // Location state for zip code management
 type LocationState = {
   zipCode: string | null;
+  isLoading: boolean;
+};
+
+// Daily message tracking state
+type MessageLimitState = {
+  dailyMessageCount: number;
+  lastMessageDate: string | null;
   isLoading: boolean;
 };
 
@@ -96,6 +105,12 @@ interface StoreState {
   loadZipCode: () => Promise<void>;
   detectZipCodeFromMessage: (message: string) => string | null;
   hasZipCode: () => boolean;
+  // Message limit state
+  messageLimit: MessageLimitState;
+  incrementDailyMessageCount: () => Promise<void>;
+  checkDailyMessageLimit: () => Promise<boolean>;
+  loadDailyMessageCount: () => Promise<void>;
+  resetDailyMessageCount: () => Promise<void>;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -171,6 +186,12 @@ export const useStore = create<StoreState>((set) => ({
   // Location state
   location: {
     zipCode: null,
+    isLoading: false,
+  },
+  // Message limit state
+  messageLimit: {
+    dailyMessageCount: 0,
+    lastMessageDate: null,
     isLoading: false,
   },
   setSidebarVisible: (visible: boolean) =>
@@ -344,5 +365,111 @@ export const useStore = create<StoreState>((set) => ({
   hasZipCode: () => {
     const { location } = useStore.getState();
     return location.zipCode !== null && location.zipCode !== '';
+  },
+  // Message limit methods
+  incrementDailyMessageCount: async () => {
+    try {
+      const today = new Date().toDateString();
+      const { messageLimit } = useStore.getState();
+      
+      // Check if it's a new day and reset count if needed
+      if (messageLimit.lastMessageDate !== today) {
+        set((state) => ({
+          messageLimit: {
+            ...state.messageLimit,
+            dailyMessageCount: 1,
+            lastMessageDate: today,
+          },
+        }));
+        
+        await AsyncStorage.setItem(STORAGE_KEYS.DAILY_MESSAGE_COUNT, '1');
+        await AsyncStorage.setItem(STORAGE_KEYS.LAST_MESSAGE_DATE, today);
+      } else {
+        const newCount = messageLimit.dailyMessageCount + 1;
+        set((state) => ({
+          messageLimit: {
+            ...state.messageLimit,
+            dailyMessageCount: newCount,
+          },
+        }));
+        
+        await AsyncStorage.setItem(STORAGE_KEYS.DAILY_MESSAGE_COUNT, newCount.toString());
+      }
+    } catch (error) {
+      console.error('Failed to increment daily message count:', error);
+    }
+  },
+  checkDailyMessageLimit: async () => {
+    try {
+      const today = new Date().toDateString();
+      const { messageLimit } = useStore.getState();
+      
+      // If it's a new day, user has 0 messages for today
+      if (messageLimit.lastMessageDate !== today) {
+        return false; // Under limit
+      }
+      
+      // Check if user has reached the 5 message limit
+      return messageLimit.dailyMessageCount >= 5;
+    } catch (error) {
+      console.error('Failed to check daily message limit:', error);
+      return false; // Default to allowing messages on error
+    }
+  },
+  loadDailyMessageCount: async () => {
+    try {
+      set((state) => ({
+        messageLimit: { ...state.messageLimit, isLoading: true },
+      }));
+      
+      const countStr = await AsyncStorage.getItem(STORAGE_KEYS.DAILY_MESSAGE_COUNT);
+      const lastDate = await AsyncStorage.getItem(STORAGE_KEYS.LAST_MESSAGE_DATE);
+      const today = new Date().toDateString();
+      
+      // If it's a new day, reset the count
+      if (lastDate !== today) {
+        set((state) => ({
+          messageLimit: {
+            dailyMessageCount: 0,
+            lastMessageDate: today,
+            isLoading: false,
+          },
+        }));
+        
+        await AsyncStorage.setItem(STORAGE_KEYS.DAILY_MESSAGE_COUNT, '0');
+        await AsyncStorage.setItem(STORAGE_KEYS.LAST_MESSAGE_DATE, today);
+      } else {
+        const count = countStr ? parseInt(countStr, 10) : 0;
+        set((state) => ({
+          messageLimit: {
+            dailyMessageCount: count,
+            lastMessageDate: lastDate,
+            isLoading: false,
+          },
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to load daily message count:', error);
+      set((state) => ({
+        messageLimit: { ...state.messageLimit, isLoading: false },
+      }));
+    }
+  },
+  resetDailyMessageCount: async () => {
+    try {
+      const today = new Date().toDateString();
+      set((state) => ({
+        messageLimit: {
+          dailyMessageCount: 0,
+          lastMessageDate: today,
+          isLoading: false,
+        },
+      }));
+      
+      await AsyncStorage.setItem(STORAGE_KEYS.DAILY_MESSAGE_COUNT, '0');
+      await AsyncStorage.setItem(STORAGE_KEYS.LAST_MESSAGE_DATE, today);
+    } catch (error) {
+      console.error('Failed to reset daily message count:', error);
+    }
   },
 }));

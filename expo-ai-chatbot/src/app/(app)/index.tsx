@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Pressable, TextInput, ScrollView } from "react-native";
+import { Pressable, TextInput, ScrollView, Linking, Alert, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack, useRouter } from "expo-router";
 import { generateUUID, type UIMessage } from "@/lib/utils";
@@ -13,12 +13,13 @@ import { useStore } from "@/lib/globalStore";
 import { Mic } from "lucide-react-native";
 import { useAIStreaming } from "@/hooks/useAIStreaming";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { useColorScheme } from "react-native";
 import { useColorScheme as useCustomColorScheme } from "@/lib/useColorScheme";
 import { getSystemPrompt } from "@/lib/system-prompt";
 import { type CoreMessage } from "ai";
 import type { ChatSession } from "@/lib/globalStore";
 import { adapty } from 'react-native-adapty';
+// Import UI helpers from the Adapty SDK directly to avoid version mismatch
+import { createPaywallView } from 'react-native-adapty/dist/ui';
 // import { emailService } from "@/lib/email-service";
 
 const HomePage = () => {
@@ -34,11 +35,13 @@ const HomePage = () => {
     setStreamingState,
     resetStreamingState,
     saveCurrentSession,
-    loadChatSession,
     loadChatHistory,
     detectZipCodeFromMessage,
     setZipCode,
     hasZipCode,
+    incrementDailyMessageCount,
+    checkDailyMessageLimit,
+    loadDailyMessageCount,
   } = useStore();
   const inputRef = useRef<TextInput>(null);
   const [messages, setMessages] = useState<UIMessage[]>([]);
@@ -52,6 +55,9 @@ const HomePage = () => {
     }
     // Load chat history on app start
     loadChatHistory();
+    
+    // Load daily message count
+    loadDailyMessageCount();
     
     // Initialize Adapty SDK
     const adaptyKey = process.env.EXPO_PUBLIC_ADAPTY_SDK_KEY;
@@ -103,6 +109,64 @@ const HomePage = () => {
     handleNewChat();
   }, [handleNewChat]);
 
+  const showPaywall = useCallback(async () => {
+    try {
+      // Show user-friendly message about reaching the limit
+      Alert.alert(
+        'Daily Message Limit Reached',
+        'You\'ve reached your daily limit of 5 free messages. Upgrade to continue chatting!',
+        [
+          {
+            text: 'Maybe Later',
+            style: 'cancel',
+          },
+          {
+            text: 'Upgrade Now',
+            onPress: async () => {
+              try {
+                const paywall = await adapty.getPaywall('ID_1');
+                
+                if (!paywall.hasViewConfiguration) {
+                  Alert.alert(
+                    'Service Unavailable',
+                    'Upgrade service is temporarily unavailable. Please try again later.',
+                    [{ text: 'OK' }]
+                  );
+                  return;
+                }
+                
+                const view = await createPaywallView(paywall);
+                
+                view.registerEventHandlers({
+                  onUrlPress(url) {
+                    Linking.openURL(url);
+                    return false;
+                  },
+                });
+                
+                await view.present();
+              } catch (paywallError) {
+                console.error('Error showing paywall:', paywallError);
+                Alert.alert(
+                  'Error',
+                  'Unable to load upgrade options. Please check your internet connection and try again.',
+                  [{ text: 'OK' }]
+                );
+              }
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error in showPaywall:', error);
+      Alert.alert(
+        'Error',
+        'Something went wrong. Please try again later.',
+        [{ text: 'OK' }]
+      );
+    }
+  }, []);
+
   const handleFeedback = useCallback(async (messageId: string, type: 'positive' | 'negative') => {
     setMessages(prev => 
       prev.map(msg => 
@@ -135,6 +199,14 @@ const HomePage = () => {
       return;
     }
 
+    // Check daily message limit for free tier users
+    const hasReachedLimit = await checkDailyMessageLimit();
+    if (hasReachedLimit) {
+      console.log('[handleSubmit] Daily message limit reached, showing paywall');
+      await showPaywall();
+      return;
+    }
+
     console.log('[handleSubmit] Creating user message...');
     const userMessage: UIMessage = {
       id: generateUUID(),
@@ -142,6 +214,10 @@ const HomePage = () => {
       content: input.trim(),
     };
     console.log('[handleSubmit] User message created:', userMessage);
+
+    // Increment daily message count for the user
+    await incrementDailyMessageCount();
+    console.log('[handleSubmit] Daily message count incremented');
 
     // Check for zip code in user message and store it
     console.log('[handleSubmit] Detecting zip code...');
@@ -213,7 +289,7 @@ const HomePage = () => {
         error: error instanceof Error ? error.message : "An error occurred",
       });
     }
-  }, [input, messages, setInput, setMessages, setStreamingState, detectZipCodeFromMessage, hasZipCode, setZipCode, startStreaming, getSystemPrompt]);
+  }, [input, messages, setInput, setMessages, setStreamingState, detectZipCodeFromMessage, hasZipCode, setZipCode, startStreaming, getSystemPrompt, checkDailyMessageLimit, incrementDailyMessageCount, showPaywall]);
 
   const { bottom } = useSafeAreaInsets();
   const scrollViewRef = useRef<GHScrollView>(null);

@@ -73,7 +73,6 @@
     "ios": {
       "bundleIdentifier": "com.keliaiexpochatbot.lite",
       "supportsTablet": true,
-      "deploymentTarget": "26.0",
       "infoPlist": {
         "NSAppleIntelligenceUsageDescription": "This app uses Apple Intelligence to provide enhanced AI-powered responses and contextual assistance.",
         "NSLocationWhenInUseUsageDescription": "This app uses your location to provide contextual AI responses and location-based queries when you're actively using the app.",

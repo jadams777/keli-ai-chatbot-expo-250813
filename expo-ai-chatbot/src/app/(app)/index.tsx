@@ -111,59 +111,25 @@ const HomePage = () => {
 
   const showPaywall = useCallback(async () => {
     try {
-      // Show user-friendly message about reaching the limit
-      Alert.alert(
-        'Daily Message Limit Reached',
-        'You\'ve reached your daily limit of 5 free messages. Upgrade to continue chatting!',
-        [
-          {
-            text: 'Maybe Later',
-            style: 'cancel',
-          },
-          {
-            text: 'Upgrade Now',
-            onPress: async () => {
-              try {
-                const paywall = await adapty.getPaywall('ID_1');
-                
-                if (!paywall.hasViewConfiguration) {
-                  Alert.alert(
-                    'Service Unavailable',
-                    'Upgrade service is temporarily unavailable. Please try again later.',
-                    [{ text: 'OK' }]
-                  );
-                  return;
-                }
-                
-                const view = await createPaywallView(paywall);
-                
-                view.registerEventHandlers({
-                  onUrlPress(url) {
-                    Linking.openURL(url);
-                    return false;
-                  },
-                });
-                
-                await view.present();
-              } catch (paywallError) {
-                console.error('Error showing paywall:', paywallError);
-                Alert.alert(
-                  'Error',
-                  'Unable to load upgrade options. Please check your internet connection and try again.',
-                  [{ text: 'OK' }]
-                );
-              }
-            },
-          },
-        ]
-      );
+      const paywall = await adapty.getPaywall('ID_1');
+      
+      if (!paywall.hasViewConfiguration) {
+        console.error('Paywall does not have view configuration');
+        return;
+      }
+      
+      const view = await createPaywallView(paywall);
+      
+      view.registerEventHandlers({
+        onUrlPress(url) {
+          Linking.openURL(url);
+          return false;
+        },
+      });
+      
+      await view.present();
     } catch (error) {
-      console.error('Error in showPaywall:', error);
-      Alert.alert(
-        'Error',
-        'Something went wrong. Please try again later.',
-        [{ text: 'OK' }]
-      );
+      console.error('Error showing paywall:', error);
     }
   }, []);
 

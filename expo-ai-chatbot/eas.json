@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 10.2.1"
+    "version": ">= 10.2.1",
+    "appVersionSource": "remote"
   },
   "build": {
     "development:emulator": {
@@ -67,11 +68,13 @@
       "autoIncrement": true
     },
     "production": {
+      "distribution": "store",
       "env": {
         "APP_ENV": "production",
         "NODE_ENV": "production"
       },
-      "channel": "production"
+      "channel": "production",
+      "autoIncrement": true
     }
   },
   "submit": {

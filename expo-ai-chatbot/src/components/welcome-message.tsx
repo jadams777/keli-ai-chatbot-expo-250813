@@ -27,7 +27,7 @@ export const WelcomeMessage = () => {
         </Text>
         {!hasZipCode() && (
           <Text className="text-center leading-7 mt-4">
-            If you give me your zip code, I'll personalize weather and local search.
+            If you provide your zip code, I'll personalize weather and local search.
           </Text>
         )}
       </View>

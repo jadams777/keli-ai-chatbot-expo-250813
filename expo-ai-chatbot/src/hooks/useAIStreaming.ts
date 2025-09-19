@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { streamText, generateText, type CoreMessage } from 'ai';
+import { streamText, type CoreMessage } from 'ai';
 import { getAvailableProvider, getModelConfig } from '../lib/ai-providers';
 import { useStore, type ToolCall } from '../lib/globalStore';
 import { getWeatherTool, webSearchTool, getLocationTool, getCalendarEventsTool, createCalendarEventTool, updateCalendarEventTool, deleteCalendarEventTool } from '../lib/tools';
@@ -62,45 +62,7 @@ export function useAIStreaming() {
       console.log('[useAIStreaming] Creating new AbortController');
       abortControllerRef.current = new AbortController();
 
-      if (isLocal && modelName === 'apple-intelligence') {
-        const generateConfig = {
-          model: provider,
-          messages: options.messages,
-          tools: { 
-            getWeather: getWeatherTool, 
-            search: webSearchTool, 
-            getLocation: getLocationTool,
-            getCalendarEvents: getCalendarEventsTool,
-            createCalendarEvent: createCalendarEventTool,
-            updateCalendarEvent: updateCalendarEventTool,
-            deleteCalendarEvent: deleteCalendarEventTool
-          },
-          maxOutputTokens: options.maxOutputTokens || modelConfig.maxOutputTokens,
-          temperature: options.temperature || modelConfig.temperature,
-          topP: options.topP || modelConfig.topP,
-          abortSignal: abortControllerRef.current.signal,
-        };
-        
-        const result = await generateText(generateConfig);
-        const cleanedText = cleanText(result.text);
-
-        if (result.toolCalls && result.toolCalls.length > 0) {
-          const toolCalls: ToolCall[] = result.toolCalls.map((toolCall: any) => ({
-            toolCallId: toolCall.toolCallId,
-            toolName: toolCall.toolName,
-            args: toolCall.args,
-          }));
-          setState(prev => ({ ...prev, text: cleanedText, content: cleanedText, toolCalls, isStreaming: false }));
-          setStreamingState({ isStreaming: false, streamingText: cleanedText, toolCalls });
-        } else {
-          setState(prev => ({ ...prev, text: cleanedText, content: cleanedText, isStreaming: false }));
-          setStreamingState({ isStreaming: false, streamingText: cleanedText });
-        }
-        
-        return;
-      }
-
-      const streamConfig = {
+      const streamConfig: any = {
         model: provider,
         messages: options.messages,
         maxOutputTokens: options.maxOutputTokens || modelConfig.maxOutputTokens,
@@ -108,6 +70,18 @@ export function useAIStreaming() {
         topP: options.topP || modelConfig.topP,
         abortSignal: abortControllerRef.current.signal,
       };
+
+      if (isLocal && modelName === 'apple-intelligence') {
+        streamConfig.tools = {
+          getWeather: getWeatherTool,
+          search: webSearchTool,
+          getLocation: getLocationTool,
+          getCalendarEvents: getCalendarEventsTool,
+          createCalendarEvent: createCalendarEventTool,
+          updateCalendarEvent: updateCalendarEventTool,
+          deleteCalendarEvent: deleteCalendarEventTool,
+        };
+      }
       
       const result = await streamText(streamConfig);
 
@@ -119,6 +93,22 @@ export function useAIStreaming() {
         const cleanedStreamingText = accumulatedText.replace(/^(null|Null)\s*/, '');
         setState(prev => ({ ...prev, text: cleanedStreamingText, content: cleanedStreamingText }));
         setStreamingState({ streamingText: cleanedStreamingText });
+      }
+
+      try {
+        const streamToolCalls = await result.toolCalls;
+        if (streamToolCalls && streamToolCalls.length > 0) {
+          const toolCalls: ToolCall[] = streamToolCalls.map((toolCall: any) => ({
+            toolCallId: toolCall.toolCallId,
+            toolName: toolCall.toolName,
+            args: toolCall.args,
+            result: toolCall.result,
+          }));
+          setState(prev => ({ ...prev, toolCalls }));
+          setStreamingState({ toolCalls });
+        }
+      } catch (toolError) {
+        console.warn('[useAIStreaming] Failed to resolve tool calls from stream:', toolError);
       }
 
       setState(prev => ({ ...prev, isStreaming: false }));

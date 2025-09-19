@@ -11,7 +11,8 @@ import { MenuButton } from "@/components/MenuButton";
 import type { ScrollView as GHScrollView } from "react-native-gesture-handler";
 import { useStore } from "@/lib/globalStore";
 import { Mic } from "lucide-react-native";
-import { useAIStreaming } from "@/hooks/useAIStreaming";
+import { streamText } from 'ai';
+import { apple } from '@react-native-ai/apple';
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useColorScheme as useCustomColorScheme } from "@/lib/useColorScheme";
 import { getSystemPrompt } from "@/lib/system-prompt";
@@ -47,7 +48,7 @@ const HomePage = () => {
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [input, setInput] = useState("");
   const [awaitingFeedbackResponse, setAwaitingFeedbackResponse] = useState<string | null>(null);
-  const { startStreaming, cancelStreaming, reset: resetStreaming } = useAIStreaming();
+  const [streamingController, setStreamingController] = useState<AbortController | null>(null);
 
   useEffect(() => {
     if (!chatId) {
@@ -74,19 +75,19 @@ const HomePage = () => {
   }, [messages, chatId]);
 
   const handleNewChat = useCallback(() => {
-    if (streaming.isStreaming) {
-      cancelStreaming();
+    if (streaming.isStreaming && streamingController) {
+      streamingController.abort();
+      setStreamingController(null);
     }
     setMessages([]);
     resetStreamingState();
-    resetStreaming();
     clearImageUris();
     
     const newChatId = generateUUID();
     setChatId({ id: newChatId, from: "newChat" });
     inputRef.current?.focus();
     setBottomChatHeightHandler(false);
-  }, [clearImageUris, setBottomChatHeightHandler, setChatId, streaming.isStreaming, cancelStreaming, resetStreamingState, resetStreaming]);
+  }, [clearImageUris, setBottomChatHeightHandler, setChatId, streaming.isStreaming, streamingController, resetStreamingState]);
 
   const handleSelectSession = useCallback((session: ChatSession) => {
     // Save current session before switching
@@ -99,18 +100,38 @@ const HomePage = () => {
     setChatId({ id: session.id, from: "history" });
     
     // Stop any ongoing streaming
-    if (streaming.isStreaming) {
-      cancelStreaming();
+    if (streaming.isStreaming && streamingController) {
+      streamingController.abort();
+      setStreamingController(null);
       resetStreamingState();
     }
-  }, [messages, chatId, saveCurrentSession, setChatId, streaming.isStreaming, cancelStreaming, resetStreamingState]);
+  }, [messages, chatId, saveCurrentSession, setChatId, streaming.isStreaming, streamingController, resetStreamingState]);
 
   const handleNewChatFromSidebar = useCallback(() => {
     handleNewChat();
   }, [handleNewChat]);
 
+  const checkSubscriptionStatus = useCallback(async () => {
+    try {
+      const profile = await adapty.getProfile();
+      const accessLevels = profile?.accessLevels ?? {};
+      return Object.values(accessLevels).some(
+        (level: any) => level?.isActive === true,
+      );
+    } catch (error) {
+      console.error('Error fetching subscription status:', error);
+      return false;
+    }
+  }, []);
+
   const showPaywall = useCallback(async () => {
     try {
+      const hasActiveSubscription = await checkSubscriptionStatus();
+      if (hasActiveSubscription) {
+        console.log('[showPaywall] Active subscription detected, skipping paywall');
+        return;
+      }
+
       const paywall = await adapty.getPaywall('ID_1');
       
       if (!paywall.hasViewConfiguration) {
@@ -131,7 +152,7 @@ const HomePage = () => {
     } catch (error) {
       console.error('Error showing paywall:', error);
     }
-  }, []);
+  }, [checkSubscriptionStatus]);
 
   const handleFeedback = useCallback(async (messageId: string, type: 'positive' | 'negative') => {
     setMessages(prev => 
@@ -166,11 +187,14 @@ const HomePage = () => {
     }
 
     // Check daily message limit for free tier users
-    const hasReachedLimit = await checkDailyMessageLimit();
-    if (hasReachedLimit) {
-      console.log('[handleSubmit] Daily message limit reached, showing paywall');
-      await showPaywall();
-      return;
+    const hasActiveSubscription = await checkSubscriptionStatus();
+    if (!hasActiveSubscription) {
+      const hasReachedLimit = await checkDailyMessageLimit();
+      if (hasReachedLimit) {
+        console.log('[handleSubmit] Daily message limit reached, showing paywall');
+        await showPaywall();
+        return;
+      }
     }
 
     console.log('[handleSubmit] Creating user message...');
@@ -222,6 +246,7 @@ const HomePage = () => {
       streamingText: "",
       error: null,
     });
+    console.log('[handleSubmit] After setStreamingState - streaming state:', streaming);
 
     console.log('[handleSubmit] Clearing input...');
     setInput("");
@@ -239,13 +264,46 @@ const HomePage = () => {
         messagesCount: coreMessages.length + 1,
         systemPromptLength: systemPrompt.length
       });
-      await startStreaming({
+      
+      const controller = new AbortController();
+      setStreamingController(controller);
+      
+      const { textStream } = await streamText({
+        model: apple(),
         messages: [
           { role: 'system', content: systemPrompt },
           ...coreMessages
         ],
+        abortSignal: controller.signal,
       });
-      console.log('[handleSubmit] Streaming started successfully');
+      
+      let accumulatedText = '';
+      
+      for await (const delta of textStream) {
+        if (controller.signal.aborted) {
+          break;
+        }
+
+        accumulatedText += delta;
+        
+        setStreamingState({
+          isStreaming: true,
+          currentMessageId: assistantMessage.id,
+          streamingText: accumulatedText,
+          error: null,
+        });
+      }
+      
+      // Streaming completed
+      setStreamingState({
+        isStreaming: false,
+        currentMessageId: null,
+        streamingText: "",
+        error: null,
+      });
+
+      setStreamingController(null);
+      console.log('[handleSubmit] Streaming completed successfully');
     } catch (error) {
       console.error('[handleSubmit] Error starting streaming:', error);
       setStreamingState({
@@ -254,8 +312,9 @@ const HomePage = () => {
         streamingText: "",
         error: error instanceof Error ? error.message : "An error occurred",
       });
+      setStreamingController(null);
     }
-  }, [input, messages, setInput, setMessages, setStreamingState, detectZipCodeFromMessage, hasZipCode, setZipCode, startStreaming, getSystemPrompt, checkDailyMessageLimit, incrementDailyMessageCount, showPaywall]);
+  }, [input, messages, setInput, setMessages, setStreamingState, detectZipCodeFromMessage, hasZipCode, setZipCode, getSystemPrompt, checkSubscriptionStatus, checkDailyMessageLimit, incrementDailyMessageCount, showPaywall]);
 
   const { bottom } = useSafeAreaInsets();
   const scrollViewRef = useRef<GHScrollView>(null);
@@ -346,7 +405,10 @@ const HomePage = () => {
           clearImageUris();
         }}
         onStop={() => {
-          cancelStreaming();
+          if (streamingController) {
+            streamingController.abort();
+            setStreamingController(null);
+          }
           resetStreamingState();
         }}
       />

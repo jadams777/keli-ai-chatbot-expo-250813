@@ -67,6 +67,9 @@
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_CALENDAR",
         "android.permission.WRITE_CALENDAR"
       ]
     },
@@ -97,6 +100,9 @@
       "eas": {
         "projectId": "f3d58fa9-ca15-4bc6-bbb9-d651a2feef5a"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f3d58fa9-ca15-4bc6-bbb9-d651a2feef5a"
     }
   }
 }
